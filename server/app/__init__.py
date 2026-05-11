@@ -1,9 +1,9 @@
 from flask import Flask
 from .config import Config
 from .extensions import db, migrate, jwt
-from .models import User, Worker
 
 from .routes.auth_routes import auth_bp
+from .routes.job_routes import job_bp
 
 
 def create_app():
@@ -16,5 +16,6 @@ def create_app():
     jwt.init_app(app)
 
     app.register_blueprint(auth_bp)
+    app.register_blueprint(job_bp)
 
     return app
