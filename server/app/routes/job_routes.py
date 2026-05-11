@@ -76,14 +76,18 @@ def accept_job(job_id):
 # =========================
 @job_bp.route("/jobs/<int:job_id>/complete", methods=["PATCH"])
 def complete_job(job_id):
-
     job = Job.query.get(job_id)
 
     if not job:
-        return jsonify({"error": "Job not found"}), 404
+        return {"error": "Job not found"}, 404
 
     job.status = "completed"
 
+    # 👇 THIS is what you were missing
+    worker = Worker.query.get(job.worker_id)
+    if worker:
+        worker.total_jobs_completed += 1
+
     db.session.commit()
 
-    return jsonify({"message": "Job completed"})
+    return {"message": "Job completed"}
