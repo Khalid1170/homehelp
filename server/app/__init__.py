@@ -4,6 +4,7 @@ from .extensions import db, migrate, jwt
 
 from .routes.auth_routes import auth_bp
 from .routes.job_routes import job_bp
+from .routes.admin_routes import admin_bp
 
 
 def create_app():
@@ -17,5 +18,6 @@ def create_app():
 
     app.register_blueprint(auth_bp)
     app.register_blueprint(job_bp)
+    app.register_blueprint(admin_bp)
 
     return app
