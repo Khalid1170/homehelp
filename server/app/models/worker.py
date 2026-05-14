@@ -45,6 +45,11 @@ class Worker(db.Model):
         default=0.0
     )
 
+    total_reviews = db.Column(
+        db.Integer,
+        default=0
+    )
+
     stripe_account_id = db.Column(db.String)
 
     created_at = db.Column(

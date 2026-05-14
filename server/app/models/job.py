@@ -17,6 +17,10 @@ class Job(db.Model):
 
     location_text = db.Column(db.String(255))
 
+    payment_status = db.Column(db.String(50), default="unpaid")
+    stripe_session_id = db.Column(db.String(255), nullable=True)
+    amount_paid = db.Column(db.Float, nullable=True)
+
     status = db.Column(
         db.String(50),
         default="open"
