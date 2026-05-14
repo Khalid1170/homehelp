@@ -457,9 +457,11 @@ def accept_job(job_id):
 
     user = User.query.get(get_jwt_identity())
 
+    # 1. ROLE CHECK
     if user.role != "worker":
         return jsonify({"error": "Only workers can accept jobs"}), 403
 
+    # 2. LOAD DATA
     worker = Worker.query.filter_by(user_id=user.id).first()
     job = Job.query.get(job_id)
 
@@ -469,22 +471,52 @@ def accept_job(job_id):
     if not job:
         return jsonify({"error": "Job not found"}), 404
 
-    # ✅ PAYMENT GATE (YOU ASKED THIS)
+    # 3. ESCROW PAYMENT CHECK (NEW CORE RULE)
     if job.payment_status != "paid":
-        return jsonify({"error": "Job must be paid before acceptance"}), 400
+        return jsonify({
+            "error": "Job must be paid before acceptance"
+        }), 400
 
+    # 4. JOB STATE CHECK
     if job.status != "open":
-        return jsonify({"error": "Job already taken"}), 400
+        return jsonify({
+            "error": "Job is not available"
+        }), 400
 
+    # 5. PREVENT DOUBLE ASSIGNMENT (IMPORTANT FIX)
+    if job.worker_id is not None:
+        return jsonify({
+            "error": "Job already assigned to a worker"
+        }), 400
+
+    # 6. WORKER VERIFICATION CHECK
     if worker.verification_status != "verified":
-        return jsonify({"error": "Worker not verified"}), 403
+        return jsonify({
+            "error": "Worker not verified"
+        }), 403
 
+    # 7. PREVENT WORKER TAKING MULTIPLE ACTIVE JOBS
+    active_job = Job.query.filter_by(
+        worker_id=worker.id,
+        status="accepted"
+    ).first()
+
+    if active_job:
+        return jsonify({
+            "error": "Worker already has an active job"
+        }), 400
+
+    # 8. ASSIGN JOB
     job.worker_id = worker.id
     job.status = "accepted"
 
     db.session.commit()
 
-    return jsonify({"message": "Job accepted"}), 200
+    return jsonify({
+        "message": "Job accepted successfully",
+        "job_id": job.id,
+        "worker_id": worker.id
+    }), 200
 
 
 # =========================
@@ -590,3 +622,43 @@ def pay_job(job_id):
     db.session.commit()
 
     return jsonify({"checkout_url": session.url}), 200
+
+
+import stripe
+from flask import request, current_app, jsonify
+from app.models import Job
+from app.extensions import db
+from flask import Blueprint
+
+job_bp = Blueprint("job_bp", __name__)
+
+@job_bp.route("/stripe/webhook", methods=["POST"])
+def stripe_webhook():
+
+    payload = request.data
+    sig_header = request.headers.get("Stripe-Signature")
+
+    endpoint_secret = current_app.config["STRIPE_WEBHOOK_SECRET"]
+
+    try:
+        event = stripe.Webhook.construct_event(
+            payload,
+            sig_header,
+            endpoint_secret
+        )
+    except Exception as e:
+        return jsonify({"error": str(e)}), 400
+
+    # ✅ Payment successful event
+    if event["type"] == "checkout.session.completed":
+        session = event["data"]["object"]
+
+        job = Job.query.filter_by(
+            stripe_session_id=session.get("id")
+        ).first()
+
+        if job:
+            job.payment_status = "paid"
+            db.session.commit()
+
+    return jsonify({"status": "success"}), 200
