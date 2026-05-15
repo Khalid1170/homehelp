@@ -7,6 +7,17 @@ from .routes.job_routes import job_bp
 from .routes.admin_routes import admin_bp
 from .routes.review_routes import review_bp
 
+from flask import jsonify
+
+def register_error_handlers(app):
+    @app.errorhandler(500)
+    def handle_500(e):
+        return jsonify({"error": "Internal Server Error", "message": str(e)}), 500
+
+    @app.errorhandler(404)
+    def handle_404(e):
+        return jsonify({"error": "Resource not found"}), 404
+
 
 def create_app():
     app = Flask(__name__)

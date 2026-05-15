@@ -20,6 +20,41 @@ review_bp = Blueprint(
 
 
 # =========================
+# HELPER FUNCTION
+# =========================
+def update_worker_stats(worker_id):
+
+    worker = Worker.query.get(worker_id)
+
+    if not worker:
+        return
+
+    reviews = Review.query.filter_by(
+        worker_id=worker_id
+    ).all()
+
+    total_reviews = len(reviews)
+
+    if total_reviews > 0:
+
+        average = sum(
+            review.rating for review in reviews
+        ) / total_reviews
+
+        worker.average_rating = round(
+            average,
+            1
+        )
+
+        worker.total_reviews = total_reviews
+
+    else:
+
+        worker.average_rating = 0.0
+        worker.total_reviews = 0
+
+
+# =========================
 # CREATE REVIEW
 # =========================
 @review_bp.route(
@@ -29,9 +64,13 @@ review_bp = Blueprint(
 @jwt_required()
 def create_review(job_id):
 
-    current_user_id = get_jwt_identity()
+    current_user_id = int(
+        get_jwt_identity()
+    )
 
-    user = User.query.get(current_user_id)
+    user = User.query.get(
+        current_user_id
+    )
 
     # Only clients can review
     if user.role != "client":
@@ -71,10 +110,14 @@ def create_review(job_id):
     data = request.get_json()
 
     rating = data.get("rating")
-    comment = data.get("comment")
+    comment = data.get("comment", "")
 
     # Validate rating
-    if not rating or rating < 1 or rating > 5:
+    if (
+        not isinstance(rating, int)
+        or rating < 1
+        or rating > 5
+    ):
         return jsonify({
             "error": "Rating must be between 1 and 5"
         }), 400
@@ -88,29 +131,151 @@ def create_review(job_id):
     )
 
     db.session.add(review)
-    db.session.flush()
 
-    # =========================
-    # UPDATE WORKER RATINGS
-    # =========================
-
-    worker = Worker.query.get(job.worker_id)
-
-    worker.total_reviews = (worker.total_reviews or 0) + 1
-
-    all_reviews = Review.query.filter_by(
-        worker_id=worker.id
-    ).all()
-
-    total_rating = sum(r.rating for r in all_reviews)
-
-    worker.average_rating = round(
-        total_rating / worker.total_reviews,
-        1
-    )
+    # Update worker stats
+    update_worker_stats(job.worker_id)
 
     db.session.commit()
 
     return jsonify({
         "message": "Review submitted successfully"
     }), 201
+
+
+# =========================
+# GET WORKER REVIEWS
+# =========================
+@review_bp.route(
+    "/workers/<int:worker_id>/reviews",
+    methods=["GET"]
+)
+def get_worker_reviews(worker_id):
+
+    worker = Worker.query.get(worker_id)
+
+    if not worker:
+        return jsonify({
+            "error": "Worker not found"
+        }), 404
+
+    reviews = Review.query.filter_by(
+        worker_id=worker_id
+    ).all()
+
+    return jsonify([
+        {
+            "id": review.id,
+            "rating": review.rating,
+            "comment": review.comment,
+            "job_id": review.job_id,
+            "client_id": review.client_id
+        }
+        for review in reviews
+    ]), 200
+
+
+# =========================
+# EDIT REVIEW
+# =========================
+@review_bp.route(
+    "/reviews/<int:review_id>",
+    methods=["PUT"]
+)
+@jwt_required()
+def edit_review(review_id):
+
+    current_user_id = int(
+        get_jwt_identity()
+    )
+
+    review = Review.query.get(
+        review_id
+    )
+
+    if not review:
+        return jsonify({
+            "error": "Review not found"
+        }), 404
+
+    # Only owner can edit
+    if review.client_id != current_user_id:
+        return jsonify({
+            "error": "Unauthorized"
+        }), 403
+
+    data = request.get_json()
+
+    new_rating = data.get("rating")
+    new_comment = data.get("comment")
+
+    # Update rating
+    if new_rating is not None:
+
+        if (
+            not isinstance(new_rating, int)
+            or new_rating < 1
+            or new_rating > 5
+        ):
+            return jsonify({
+                "error": "Rating must be between 1 and 5"
+            }), 400
+
+        review.rating = new_rating
+
+    # Update comment
+    if new_comment is not None:
+        review.comment = new_comment
+
+    # Recalculate stats
+    update_worker_stats(
+        review.worker_id
+    )
+
+    db.session.commit()
+
+    return jsonify({
+        "message": "Review updated successfully"
+    }), 200
+
+
+# =========================
+# DELETE REVIEW
+# =========================
+@review_bp.route(
+    "/reviews/<int:review_id>",
+    methods=["DELETE"]
+)
+@jwt_required()
+def delete_review(review_id):
+
+    current_user_id = int(
+        get_jwt_identity()
+    )
+
+    review = Review.query.get(
+        review_id
+    )
+
+    if not review:
+        return jsonify({
+            "error": "Review not found"
+        }), 404
+
+    # Only owner can delete
+    if review.client_id != current_user_id:
+        return jsonify({
+            "error": "Unauthorized"
+        }), 403
+
+    worker_id = review.worker_id
+
+    db.session.delete(review)
+
+    # Recalculate worker stats
+    update_worker_stats(worker_id)
+
+    db.session.commit()
+
+    return jsonify({
+        "message": "Review deleted successfully"
+    }), 200
