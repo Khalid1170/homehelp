@@ -553,28 +553,50 @@ def mark_job_finished(job_id):
 @job_bp.route("/jobs/<int:job_id>/confirm", methods=["PATCH"])
 @jwt_required()
 def confirm_job_completion(job_id):
-
     user = User.query.get(get_jwt_identity())
     job = Job.query.get(job_id)
 
     if user.role != "client":
-        return jsonify({"error": "Only clients"}), 403
+        return jsonify({"error": "Only clients can confirm completion"}), 403
+
+    if not job:
+        return jsonify({"error": "Job not found"}), 404
 
     if job.client_id != user.id:
         return jsonify({"error": "Unauthorized"}), 403
 
     if job.status != "pending_confirmation":
-        return jsonify({"error": "Not ready"}), 400
+        return jsonify({"error": "Job is not pending confirmation"}), 400
 
+    # Fetch the worker assigned to this specific job
     worker = Worker.query.get(job.worker_id)
 
+    # 🛡️ SAFETY CHECK: Verify a worker is actually attached to this job
+    if not worker:
+        return jsonify({"error": "No worker is currently assigned to this job"}), 400
+
+    # 1. Update status metrics
     job.status = "completed"
-    worker.total_jobs_completed += 1
+    worker.total_jobs_completed = (worker.total_jobs_completed or 0) + 1
+
+    # 2. Calculate the 15% platform deduction split
+    # Safe fallback if amount_paid is somehow missing/None
+    gross_amount = job.amount_paid or 0.0             
+    deduction = round(gross_amount * 0.15, 2)          
+    net_amount = round(gross_amount - deduction, 2)    
+
+    # 3. Increment lifetime stats on worker profile securely
+    worker.total_gross_earnings = (worker.total_gross_earnings or 0.0) + gross_amount
+    worker.total_net_earnings = (worker.total_net_earnings or 0.0) + net_amount
 
     db.session.commit()
 
-    return jsonify({"message": "Completed"}), 200
-
+    return jsonify({
+        "message": "Job completed successfully",
+        "gross_earned": gross_amount,
+        "platform_fee_15pct": deduction,
+        "net_earned": net_amount
+    }), 200
 
 # =========================
 # CREATE STRIPE CHECKOUT
@@ -669,14 +691,61 @@ def pay_job(job_id):
 # =========================
 # STRIPE WEBHOOK
 # =========================
+
+# @job_bp.route("/stripe/webhook", methods=["POST"])
+# def stripe_webhook():
+
+#     payload = request.data
+#     sig_header = request.headers.get("Stripe-Signature")
+#     endpoint_secret = current_app.config["STRIPE_WEBHOOK_SECRET"]
+
+#     print("🔔 Webhook hit")  # MUST appear in terminal
+
+#     try:
+#         event = stripe.Webhook.construct_event(
+#             payload,
+#             sig_header,
+#             endpoint_secret
+#         )
+
+#     except ValueError:
+#         print("❌ Invalid payload")
+#         return jsonify({"error": "Invalid payload"}), 400
+
+#     except stripe.error.SignatureVerificationError:
+#         print("❌ Invalid signature")
+#         return jsonify({"error": "Invalid signature"}), 400
+
+#     # ✅ SUCCESS EVENT
+#     if event["type"] == "checkout.session.completed":
+
+#         session = event["data"]["object"]
+#         stripe_session_id = session.get("id")
+
+#         print("💰 Payment success for session:", stripe_session_id)
+
+#         job = Job.query.filter_by(
+#             stripe_session_id=stripe_session_id
+#         ).first()
+
+#         if job:
+#             job.payment_status = "paid"
+#             db.session.commit()
+#             print("✅ Job marked as PAID")
+
+#     return jsonify({"message": "Webhook received"}), 200
 @job_bp.route("/stripe/webhook", methods=["POST"])
 def stripe_webhook():
 
+    print("🔥 WEBHOOK HIT")
+    stripe.api_key = current_app.config["STRIPE_SECRET_KEY"]
+
+    print(f"Flask is using secret: {current_app.config.get('STRIPE_WEBHOOK_SECRET')}")
+
     payload = request.data
     sig_header = request.headers.get("Stripe-Signature")
-    endpoint_secret = current_app.config["STRIPE_WEBHOOK_SECRET"]
 
-    print("🔔 Webhook hit")  # MUST appear in terminal
+    endpoint_secret = current_app.config["STRIPE_WEBHOOK_SECRET"]
 
     try:
         event = stripe.Webhook.construct_event(
@@ -685,29 +754,67 @@ def stripe_webhook():
             endpoint_secret
         )
 
-    except ValueError:
-        print("❌ Invalid payload")
-        return jsonify({"error": "Invalid payload"}), 400
+        print("✅ EVENT VERIFIED")
+        print(event["type"])
 
-    except stripe.error.SignatureVerificationError:
-        print("❌ Invalid signature")
-        return jsonify({"error": "Invalid signature"}), 400
+    except Exception as e:
+        print("❌ WEBHOOK ERROR:", str(e))
+        return jsonify({"error": str(e)}), 400
 
-    # ✅ SUCCESS EVENT
     if event["type"] == "checkout.session.completed":
 
         session = event["data"]["object"]
-        stripe_session_id = session.get("id")
 
-        print("💰 Payment success for session:", stripe_session_id)
+        stripe_session_id = session.id  # Proper Stripe object notation
+
+        print("SESSION ID:", stripe_session_id)
 
         job = Job.query.filter_by(
             stripe_session_id=stripe_session_id
         ).first()
 
         if job:
+            print("✅ JOB FOUND")
             job.payment_status = "paid"
+            
+            # Change job status to 'open' so workers can see it in the feed now
+            job.status = "open" 
+            
+            # 💰 NEW: Extract amount from Stripe (convert pence to pounds)
+            job.amount_paid = float(session.amount_total / 100)
+
             db.session.commit()
-            print("✅ Job marked as PAID")
+            print(f"✅ PAYMENT UPDATED: Stored £{job.amount_paid} on Job #{job.id}")
+
+        else:
+            print("❌ JOB NOT FOUND")
 
     return jsonify({"message": "Webhook received"}), 200
+
+
+# =========================
+# WORKER DASHBOARD STATS
+# =========================
+@job_bp.route("/worker/dashboard", methods=["GET"])
+@jwt_required()
+def get_worker_dashboard():
+    user = User.query.get(get_jwt_identity())
+
+    if user.role != "worker":
+        return jsonify({"error": "Unauthorized access"}), 403
+
+    worker = Worker.query.filter_by(user_id=user.id).first()
+    
+    if not worker:
+        return jsonify({"error": "Worker profile not found"}), 404
+
+    return jsonify({
+        "worker_id": worker.id,
+        "jobs_completed": worker.total_jobs_completed,
+        "average_rating": worker.average_rating,
+        
+        # Financial breakdown metrics
+        "total_gross_earnings": round(worker.total_gross_earnings or 0.0, 2),
+        "total_net_take_home": round(worker.total_net_earnings or 0.0, 2),
+        "total_platform_fees_paid": round((worker.total_gross_earnings or 0.0) - (worker.total_net_earnings or 0.0), 2)
+    }), 200

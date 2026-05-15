@@ -88,6 +88,7 @@ def create_review(job_id):
     )
 
     db.session.add(review)
+    db.session.flush()
 
     # =========================
     # UPDATE WORKER RATINGS

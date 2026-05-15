@@ -24,6 +24,8 @@ class Worker(db.Model):
     latitude = db.Column(db.Float)
 
     longitude = db.Column(db.Float)
+    total_gross_earnings = db.Column(db.Float, default=0.0) # Before your 15% split
+    total_net_earnings = db.Column(db.Float, default=0.0)   # What they actually take home
 
     availability_status = db.Column(
         db.String(20),
