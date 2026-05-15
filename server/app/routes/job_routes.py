@@ -587,6 +587,7 @@ def pay_job(job_id):
 
     user = User.query.get(get_jwt_identity())
     job = Job.query.get(job_id)
+    # print(session)
 
     if not job:
         return jsonify({"error": "Job not found"}), 404
@@ -624,21 +625,58 @@ def pay_job(job_id):
     return jsonify({"checkout_url": session.url}), 200
 
 
-import stripe
-from flask import request, current_app, jsonify
-from app.models import Job
-from app.extensions import db
-from flask import Blueprint
+# import stripe
+# from flask import request, current_app, jsonify
+# from app.models import Job
+# from app.extensions import db
+# from flask import Blueprint
 
-job_bp = Blueprint("job_bp", __name__)
+# job_bp = Blueprint("job_bp", __name__)
 
+# @job_bp.route("/stripe/webhook", methods=["POST"])
+# def stripe_webhook():
+
+#     payload = request.data
+#     sig_header = request.headers.get("Stripe-Signature")
+
+#     endpoint_secret = current_app.config["STRIPE_WEBHOOK_SECRET"]
+
+#     try:
+#         event = stripe.Webhook.construct_event(
+#             payload,
+#             sig_header,
+#             endpoint_secret
+#         )
+#     except Exception as e:
+#         return jsonify({"error": str(e)}), 400
+
+#     # ✅ Payment successful event
+#     if event["type"] == "checkout.session.completed":
+#         session = event["data"]["object"]
+
+#         job = Job.query.filter_by(
+#             stripe_session_id=session.get("id")
+#         ).first()
+
+#         if job:
+#             job.payment_status = "paid"
+#             db.session.commit()
+
+#     return jsonify({"status": "success"}), 200
+
+
+
+# =========================
+# STRIPE WEBHOOK
+# =========================
 @job_bp.route("/stripe/webhook", methods=["POST"])
 def stripe_webhook():
 
     payload = request.data
     sig_header = request.headers.get("Stripe-Signature")
-
     endpoint_secret = current_app.config["STRIPE_WEBHOOK_SECRET"]
+
+    print("🔔 Webhook hit")  # MUST appear in terminal
 
     try:
         event = stripe.Webhook.construct_event(
@@ -646,19 +684,30 @@ def stripe_webhook():
             sig_header,
             endpoint_secret
         )
-    except Exception as e:
-        return jsonify({"error": str(e)}), 400
 
-    # ✅ Payment successful event
+    except ValueError:
+        print("❌ Invalid payload")
+        return jsonify({"error": "Invalid payload"}), 400
+
+    except stripe.error.SignatureVerificationError:
+        print("❌ Invalid signature")
+        return jsonify({"error": "Invalid signature"}), 400
+
+    # ✅ SUCCESS EVENT
     if event["type"] == "checkout.session.completed":
+
         session = event["data"]["object"]
+        stripe_session_id = session.get("id")
+
+        print("💰 Payment success for session:", stripe_session_id)
 
         job = Job.query.filter_by(
-            stripe_session_id=session.get("id")
+            stripe_session_id=stripe_session_id
         ).first()
 
         if job:
             job.payment_status = "paid"
             db.session.commit()
+            print("✅ Job marked as PAID")
 
-    return jsonify({"status": "success"}), 200
+    return jsonify({"message": "Webhook received"}), 200
