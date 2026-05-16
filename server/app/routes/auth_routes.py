@@ -1,6 +1,6 @@
 from flask import Blueprint, request, jsonify
 from werkzeug.security import generate_password_hash, check_password_hash
-from flask_jwt_extended import create_access_token
+from flask_jwt_extended import create_access_token , jwt_required, get_jwt_identity
 
 from app.extensions import db
 from app.models import User, Worker
@@ -87,3 +87,31 @@ def login():
         "token": token,
         "role": user.role
     })
+
+@auth_bp.route("/me", methods=["GET"])
+@jwt_required()
+def get_current_user():
+    """
+    Returns the current user's data based on the JWT token.
+    Essential for React to maintain login state.
+    """
+    current_user_id = get_jwt_identity()
+    user = User.query.get(current_user_id)
+    
+    if not user:
+        return jsonify({"error": "User not found"}), 404
+        
+    # Check if they have an active worker profile
+    worker_profile = Worker.query.filter_by(user_id=user.id).first()
+    
+    return jsonify({
+        "user": {
+            "id": user.id,
+            "full_name": user.full_name,
+            "email": user.email,
+            "role": user.role,
+            "is_suspended": user.is_suspended,
+            "has_worker_profile": bool(worker_profile),
+            "worker_id": worker_profile.id if worker_profile else None
+        }
+    }), 200

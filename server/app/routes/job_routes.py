@@ -70,16 +70,16 @@ def create_job():
     }), 201
 
 
-# =========================
+## =========================
 # GET OPEN PAID JOBS
 # =========================
 @job_bp.route("/jobs/open", methods=["GET"])
 def get_open_jobs():
-
+    # 🎯 Improvement: Added order_by to show the newest jobs at the top
     jobs = Job.query.filter_by(
         status="open",
         payment_status="paid"
-    ).all()
+    ).order_by(Job.created_at.desc()).all()
 
     return jsonify([
         {
@@ -90,6 +90,8 @@ def get_open_jobs():
             "category": job.category,
             "location": job.location_text,
             "payment_status": job.payment_status,
+            # 🎯 Improvement: Include Client name so the worker knows the poster
+            "client_name": User.query.get(job.client_id).full_name if User.query.get(job.client_id) else "Unknown Client",
             "created_at": (
                 job.created_at.isoformat()
                 if getattr(job, "created_at", None)
@@ -671,4 +673,29 @@ def get_client_dashboard():
         "active_jobs": active_jobs,
         "completed_jobs": completed_jobs
 
+    }), 200
+
+
+@job_bp.route("/workers/<int:worker_id>/public", methods=["GET"])
+def get_public_worker_profile(worker_id):
+    worker = Worker.query.get(worker_id)
+    if not worker:
+        return jsonify({"error": "Worker not found"}), 404
+
+    reviews = Review.query.filter_by(worker_id=worker.id).all()
+    
+    return jsonify({
+        "name": worker.user.full_name,
+        "bio": worker.bio,
+        "skills": worker.skills.split(",") if worker.skills else [],
+        "location": worker.location_text,
+        "rating": worker.average_rating,
+        "completed_jobs": worker.total_jobs_completed,
+        "reviews": [
+            {
+                "rating": r.rating,
+                "comment": r.comment,
+                "client": r.client_id # Or join for name
+            } for r in reviews
+        ]
     }), 200
