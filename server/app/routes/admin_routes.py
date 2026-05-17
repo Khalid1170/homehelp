@@ -3,6 +3,7 @@ from flask_jwt_extended import jwt_required, get_jwt_identity
 from app.models import User, Worker, Job, Review
 from app.extensions import db
 from sqlalchemy import func
+from sqlalchemy.orm import joinedload, subqueryload
 
 admin_bp = Blueprint("admin_bp", __name__)
 
@@ -28,7 +29,6 @@ def admin_required(fn):
 @admin_required
 def get_admin_stats():
     total_revenue = db.session.query(func.sum(Job.amount_paid)).scalar() or 0.0
-    # Platform usually takes 15% - let's calculate that for the god view
     platform_earnings = round(total_revenue * 0.15, 2)
 
     return jsonify({
@@ -52,19 +52,20 @@ def get_admin_stats():
 @jwt_required()
 @admin_required
 def get_detailed_clients():
-    clients = User.query.filter_by(role="client").all()
+    # Fix: Use subqueryload to pre-fetch all jobs related to these clients in 2 queries total
+    clients = User.query.filter_by(role="client").options(subqueryload(User.jobs)).all()
     output = []
     
     for client in clients:
-        jobs = Job.query.filter_by(client_id=client.id).all()
-        total_spent = sum(j.amount_paid for j in jobs if j.payment_status == "paid" and j.amount_paid)
+        total_spent = sum(j.amount_paid for j in client.jobs if j.payment_status == "paid" and j.amount_paid)
         
         job_history = []
-        for j in jobs:
+        for j in client.jobs:
             worker_name = "Unassigned"
+            # Accessing the backref relationship if available, safely falling back to lazy lookup 
+            # to keep things simple or loading via joined options
             if j.worker_id:
-                w_profile = Worker.query.get(j.worker_id)
-                worker_name = w_profile.user.full_name if (w_profile and w_profile.user) else "Unknown Worker"
+                worker_name = j.worker.user.full_name if (j.worker and j.worker.user) else "Unknown Worker"
                 
             job_history.append({
                 "job_id": j.id,
@@ -79,9 +80,9 @@ def get_detailed_clients():
             "id": client.id,
             "name": client.full_name,
             "email": client.email,
-            "is_suspended": client.is_suspended,
+            "is_suspended": getattr(client, "is_suspended", False),
             "stats": {
-                "jobs_posted": len(jobs),
+                "jobs_posted": len(client.jobs),
                 "total_spent": round(total_spent, 2)
             },
             "recent_activity": job_history
@@ -96,14 +97,17 @@ def get_detailed_clients():
 @jwt_required()
 @admin_required
 def get_detailed_workers():
-    workers = Worker.query.all()
+    # Fix: Eager load User profile and linked jobs to keep query overhead to a minimum
+    workers = Worker.query.options(joinedload(Worker.user), subqueryload(Worker.applications)).all()
     output = []
     
     for w in workers:
+        if not w.user:
+            continue
+            
+        # Querying jobs assigned to this worker
         jobs = Job.query.filter_by(worker_id=w.id).all()
         completed = [j for j in jobs if j.status == "completed"]
-        
-        # Calculate true earnings
         total_earned = sum(j.amount_paid for j in completed if j.amount_paid)
         
         output.append({
@@ -111,7 +115,7 @@ def get_detailed_workers():
             "name": w.user.full_name,
             "email": w.user.email,
             "rating": round(w.average_rating, 1) if w.average_rating else 0.0,
-            "is_suspended": w.user.is_suspended,
+            "is_suspended": getattr(w.user, "is_suspended", False),
             "verification": w.verification_status,
             "performance": {
                 "total_jobs": len(jobs),
@@ -129,15 +133,17 @@ def get_detailed_workers():
 @jwt_required()
 @admin_required
 def get_full_jobs_details():
-    jobs = Job.query.order_by(Job.created_at.desc()).all()
+    # Fix: Single execution pass utilizing joinedload to grab Clients and Workers simultaneously
+    jobs = Job.query.options(
+        joinedload(Job.client),
+        joinedload(Job.worker).joinedload(Worker.user)
+    ).order_by(Job.created_at.desc()).all()
+    
     output = []
     
     for j in jobs:
-        client = User.query.get(j.client_id)
-        worker_user = None
-        if j.worker_id:
-            w_profile = Worker.query.get(j.worker_id)
-            worker_user = User.query.get(w_profile.user_id) if w_profile else None
+        client_name = j.client.full_name if j.client else "Deleted Client"
+        worker_name = j.worker.user.full_name if (j.worker and j.worker.user) else "Unassigned"
 
         output.append({
             "job_id": j.id,
@@ -149,8 +155,8 @@ def get_full_jobs_details():
                 "payment_status": j.payment_status
             },
             "participants": {
-                "client": {"id": j.client_id, "name": client.full_name if client else "Deleted"},
-                "worker": {"id": j.worker_id, "name": worker_user.full_name if worker_user else "Unassigned"}
+                "client": {"id": j.client_id, "name": client_name},
+                "worker": {"id": j.worker_id, "name": worker_name}
             },
             "created_at": j.created_at.isoformat() if j.created_at else None
         })
@@ -165,7 +171,7 @@ def get_full_jobs_details():
 @admin_required
 def toggle_user_suspension(user_id):
     user = User.query.get_or_404(user_id)
-    user.is_suspended = not user.is_suspended
+    user.is_suspended = not getattr(user, "is_suspended", False)
     db.session.commit()
     return jsonify({"message": f"User status updated. Suspended: {user.is_suspended}"}), 200
 
@@ -176,7 +182,7 @@ def verify_worker(worker_id):
     worker = Worker.query.get_or_404(worker_id)
     worker.verification_status = "verified"
     db.session.commit()
-    return jsonify({"message": f"Worker {worker.user.full_name} verified"}), 200
+    return jsonify({"message": f"Worker {worker.user.full_name if worker.user else 'Unknown'} verified"}), 200
 
 @admin_bp.route("/admin/jobs/<int:job_id>/force-status", methods=["PATCH"])
 @jwt_required()
@@ -184,6 +190,10 @@ def verify_worker(worker_id):
 def admin_force_job_status(job_id):
     data = request.get_json()
     new_status = data.get("status")
+    
+    if not new_status:
+        return jsonify({"error": "Missing status value"}), 400
+        
     job = Job.query.get_or_404(job_id)
     job.status = new_status
     db.session.commit()

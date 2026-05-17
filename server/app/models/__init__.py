@@ -7,5 +7,5 @@
 
 from .user import User
 from .worker import Worker
-from .job import Job
+from .job import Job, JobApplication
 from .review import Review
