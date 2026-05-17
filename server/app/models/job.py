@@ -20,6 +20,8 @@ class Job(db.Model):
     payment_status = db.Column(db.String(50), default="unpaid")
     stripe_session_id = db.Column(db.String(255), nullable=True)
     amount_paid = db.Column(db.Float, nullable=True)
+    requested_worker_id = db.Column(db.Integer, nullable=True)
+    client = db.relationship('User', backref='jobs')
 
     status = db.Column(
         db.String(50),

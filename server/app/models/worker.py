@@ -19,6 +19,7 @@ class Worker(db.Model):
 
     skills = db.Column(db.String)
 
+    
     location_text = db.Column(db.String(255))
 
     latitude = db.Column(db.Float)
@@ -26,6 +27,8 @@ class Worker(db.Model):
     longitude = db.Column(db.Float)
     total_gross_earnings = db.Column(db.Float, default=0.0) # Before your 15% split
     total_net_earnings = db.Column(db.Float, default=0.0)   # What they actually take home
+
+    # requested_worker_id = db.Column(db.Integer, nullable=True)
 
     availability_status = db.Column(
         db.String(20),

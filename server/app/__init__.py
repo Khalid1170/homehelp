@@ -1,6 +1,7 @@
 from flask import Flask
 from .config import Config
 from .extensions import db, migrate, jwt
+from flask_cors import CORS
 
 from .routes.auth_routes import auth_bp
 from .routes.job_routes import job_bp
@@ -21,6 +22,7 @@ def register_error_handlers(app):
 
 def create_app():
     app = Flask(__name__)
+    CORS(app, resources={r"/*": {"origins": "*"}})
 
     app.config.from_object(Config)
 
