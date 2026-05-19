@@ -16,6 +16,7 @@ import WorkerDashboard from '../pages/worker/WorkerDashboard';
 
 // 📊 Admin Page Imports
 import AdminDashboard from '../pages/admin/AdminDashboard';
+import BrowseJobs from '../pages/public/BrowseJobs';
 
 // 🛡️ Protected Route Gatekeeper
 function ProtectedRoute({ children, allowedRoles }) {
@@ -67,6 +68,9 @@ export default function AppRoutes() {
           <AdminDashboard />
         </ProtectedRoute>
       } />
+
+      {/* 🌐 Open Marketplace Browser Entry Route */}
+      <Route path="/browse-jobs" element={<BrowseJobs />} />
 
       {/* Fallback Boundaries */}
       <Route path="/unauthorized" element={

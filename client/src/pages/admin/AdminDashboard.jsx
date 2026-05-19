@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import AdminTopbar from './AdminTopbar';
+import FinancialOverview from "./FinancialOverview";
+import AdminTabs from "./AdminTabs";
 
 export default function AdminDashboard() {
   const { token, logout} = useAuth();
@@ -122,90 +124,22 @@ export default function AdminDashboard() {
   logout={logout}
   navigate={navigate}
   fetchAdminData={fetchAdminData}
-/>
+    />
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-10">
         
         {/* 📊 Section 1: Financial Telemetry & Native SVG Chart Metrics */}
-        <section className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="lg:col-span-2 grid grid-cols-2 gap-4">
-            <div className="bg-slate-900 border border-slate-800 p-5 rounded-2xl">
-              <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">Gross Transaction Volume</p>
-              <p className="text-3xl font-black text-white mt-1.5 tracking-tight">£{grossVol}</p>
-              <div className="w-full bg-slate-950 h-2 rounded-full mt-4 overflow-hidden">
-                <div className="bg-white h-full" style={{ width: '100%' }}></div>
-              </div>
-            </div>
-            <div className="bg-slate-900 border border-slate-800 p-5 rounded-2xl">
-              <p className="text-xs font-bold text-blue-400 uppercase tracking-wider">Estimated Platform Cut (15%)</p>
-              <p className="text-3xl font-black text-blue-400 mt-1.5 tracking-tight">£{platformFees}</p>
-              <div className="w-full bg-slate-950 h-2 rounded-full mt-4 overflow-hidden">
-                <div className="bg-blue-500 h-full" style={{ width: `${(platformFees / chartMax) * 100}%` }}></div>
-              </div>
-            </div>
-            <div className="bg-slate-900 border border-slate-800 p-5 rounded-2xl">
-              <p className="text-xs font-bold text-emerald-400 uppercase tracking-wider">Net Specialist Capital Payouts</p>
-              <p className="text-3xl font-black text-emerald-400 mt-1.5 tracking-tight">£{payouts}</p>
-              <div className="w-full bg-slate-950 h-2 rounded-full mt-4 overflow-hidden">
-                <div className="bg-emerald-400 h-full" style={{ width: `${(payouts / chartMax) * 100}%` }}></div>
-              </div>
-            </div>
-            <div className="bg-slate-900 border border-slate-800 p-5 rounded-2xl flex items-center justify-around text-center">
-              <div>
-                <p className="text-xs font-bold text-slate-500 uppercase">Profiles</p>
-                <p className="text-xl font-black text-white mt-1">{stats?.counters?.total_users}</p>
-              </div>
-              <div>
-                <p className="text-xs font-bold text-slate-500 uppercase">Total Assignments</p>
-                <p className="text-xl font-black text-white mt-1">{stats?.counters?.total_jobs}</p>
-              </div>
-            </div>
-          </div>
-
-          {/* Native SVG Vector Bar Analytics Panel */}
-          <div className="bg-slate-900 border border-slate-800 p-5 rounded-2xl flex flex-col justify-between">
-            <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Ecosystem Capital Architecture</p>
-            <div className="w-full flex items-end justify-center gap-8 h-36 pt-4 border-b border-slate-800">
-              <div className="flex flex-col items-center gap-2 w-12">
-                <div className="w-full bg-slate-700 rounded-t-md transition-all duration-500" style={{ height: '120px' }}></div>
-                <span className="text-[10px] font-bold text-slate-500">GROSS</span>
-              </div>
-              <div className="flex flex-col items-center gap-2 w-12">
-                <div className="w-full bg-blue-500 rounded-t-md transition-all duration-500" style={{ height: `${feeHeight}px` }}></div>
-                <span className="text-[10px] font-bold text-blue-400">FEES</span>
-              </div>
-              <div className="flex flex-col items-center gap-2 w-12">
-                <div className="w-full bg-emerald-400 rounded-t-md transition-all duration-500" style={{ height: `${payoutHeight}px` }}></div>
-                <span className="text-[10px] font-bold text-emerald-400">NET</span>
-              </div>
-            </div>
-          </div>
-        </section>
+            <FinancialOverview stats={stats} />
 
         {/* 📋 Section 2: Master Tab Switches */}
         <section className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-xl">
-          <div className="px-6 py-4 border-b border-slate-800 bg-slate-900/50 flex justify-between items-center">
-            <div className="flex gap-2 p-1 bg-slate-950 rounded-xl border border-slate-800">
-              <button 
-                onClick={() => setActiveTab('jobs')}
-                className={`px-4 py-2 text-xs font-bold rounded-lg transition cursor-pointer ${activeTab === 'jobs' ? 'bg-slate-800 text-white shadow-md' : 'text-slate-500 hover:text-slate-300'}`}
-              >
-                ⚡ Full Job Lifecycles ({jobs.length})
-              </button>
-              <button 
-                onClick={() => setActiveTab('workers')}
-                className={`px-4 py-2 text-xs font-bold rounded-lg transition cursor-pointer ${activeTab === 'workers' ? 'bg-slate-800 text-white shadow-md' : 'text-slate-500 hover:text-slate-300'}`}
-              >
-                🛠️ Specialists ({workers.length})
-              </button>
-              <button 
-                onClick={() => setActiveTab('clients')}
-                className={`px-4 py-2 text-xs font-bold rounded-lg transition cursor-pointer ${activeTab === 'clients' ? 'bg-slate-800 text-white shadow-md' : 'text-slate-500 hover:text-slate-300'}`}
-              >
-                💼 Clients ({clients.length})
-              </button>
-            </div>
-          </div>
+        <AdminTabs
+  activeTab={activeTab}
+  setActiveTab={setActiveTab}
+  jobs={jobs}
+  workers={workers}
+  clients={clients}
+/>
 
           {/* =====================================
               TAB 1: COMPLETE JOB CYCLES (THE FEED)

@@ -1073,6 +1073,31 @@ def create_job():
         "job_id": job.id
     }), 201
 
+# ==========================================
+# 2. GET CLIENT'S OWN JOBS (DASHBOARD FEED)
+# ==========================================
+@job_bp.route("/jobs/my-postings", methods=["GET"])
+@jwt_required()
+def get_client_jobs():
+    user_id = get_jwt_identity()
+    user = User.query.get(user_id)
+    
+    if not user or user.role != "client":
+        return jsonify({"error": "Unauthorized Access"}), 403
+
+    jobs = Job.query.filter_by(client_id=user_id).order_by(Job.created_at.desc()).all()
+    
+    return jsonify([
+        {
+            "id": job.id,
+            "title": job.title,
+            "budget": job.budget,
+            "status": job.status,
+            "payment_status": job.payment_status,
+            "created_at": job.created_at.isoformat() if getattr(job, "created_at", None) else None
+        } for job in jobs
+    ]), 200
+
 
 # =========================
 # GET OPEN PAID JOBS
@@ -1160,6 +1185,34 @@ def get_single_job(job_id):
             else None
         )
     }), 200
+
+
+# ==========================================
+# 5. CANCEL / DELETE JOB (CLIENT)
+# ==========================================
+@job_bp.route("/jobs/<int:job_id>", methods=["DELETE"])
+@jwt_required()
+def delete_job(job_id):
+    user_id = get_jwt_identity()
+    job = Job.query.get(job_id)
+
+    if not job:
+        return jsonify({"error": "Job not found"}), 404
+
+    # Authorization guard: Ensure this posting belongs to the client attempting deletion
+    if job.client_id != user_id:
+        return jsonify({"error": "Unauthorized to cancel this job"}), 403
+
+    if job.status == "in_progress":
+        return jsonify({"error": "Cannot delete a job that is already active/in-progress"}), 400
+
+    # Cascade-delete apps manually if relationships are not set up to cascade in models
+    JobApplication.query.filter_by(job_id=job.id).delete()
+
+    db.session.delete(job)
+    db.session.commit()
+
+    return jsonify({"message": "Job deleted and canceled successfully"}), 200
 
 
 # =========================
