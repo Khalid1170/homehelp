@@ -6,6 +6,8 @@ import { useAuth } from '../context/AuthContext';
 import Home from '../pages/public/Home';
 import Login from '../pages/auth/Login';
 import Register from '../pages/auth/Register';
+import BrowseJobs from '../pages/public/BrowseJobs';
+import JobFullDetails from '../pages/public/JobFullDetails'; // 👈 Added Detail Page Import
 
 // 💼 Client Page Imports
 import ClientDashboard from '../pages/client/ClientDashboard';
@@ -13,10 +15,10 @@ import CreateJob from '../pages/client/CreateJob';
 
 // 🛠️ Worker Page Imports
 import WorkerDashboard from '../pages/worker/WorkerDashboard';
+import JobPitchForm from '../pages/worker/JobPitchForm'; // 👈 Added Worker Pitch Import
 
 // 📊 Admin Page Imports
 import AdminDashboard from '../pages/admin/AdminDashboard';
-import BrowseJobs from '../pages/public/BrowseJobs';
 
 // 🛡️ Protected Route Gatekeeper
 function ProtectedRoute({ children, allowedRoles }) {
@@ -42,6 +44,10 @@ export default function AppRoutes() {
       <Route path="/" element={<Home />} />
       <Route path="/login" element={<Login />} />
       <Route path="/register" element={<Register />} />
+      <Route path="/browse-jobs" element={<BrowseJobs />} />
+      
+      {/* 👁️ Publicly Accessible Job Details Profile View */}
+      <Route path="/jobs/:id" element={<JobFullDetails />} />
 
       {/* Client Sub-Suite */}
       <Route path="/client/dashboard" element={
@@ -61,6 +67,13 @@ export default function AppRoutes() {
           <WorkerDashboard />
         </ProtectedRoute>
       } />
+      
+      {/* 📝 Restricted Worker Proposal Submission Route */}
+      <Route path="/jobs/:id/pitch" element={
+        <ProtectedRoute allowedRoles={['worker']}>
+          <JobPitchForm />
+        </ProtectedRoute>
+      } />
 
       {/* Admin Suite */}
       <Route path="/admin/dashboard" element={
@@ -68,9 +81,6 @@ export default function AppRoutes() {
           <AdminDashboard />
         </ProtectedRoute>
       } />
-
-      {/* 🌐 Open Marketplace Browser Entry Route */}
-      <Route path="/browse-jobs" element={<BrowseJobs />} />
 
       {/* Fallback Boundaries */}
       <Route path="/unauthorized" element={
