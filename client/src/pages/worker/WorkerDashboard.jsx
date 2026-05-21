@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import Navbar from '../../components/Navbar';
+import WorkersJobCard from '../../components/WorkersJobCard';
 
 export default function WorkerDashboard() {
   const { token, logout } = useAuth();
@@ -12,6 +13,9 @@ export default function WorkerDashboard() {
   const [error, setError] = useState(null);
   const [activeTab, setActiveTab] = useState('active'); // active | completed
   const [submittingId, setSubmittingId] = useState(null);
+  
+  // Track which unique card instance is currently expanded
+  const [expandedJobId, setExpandedJobId] = useState(null);
 
   const fetchDashboardData = async () => {
     setLoading(true);
@@ -67,6 +71,10 @@ export default function WorkerDashboard() {
     } finally {
       setSubmittingId(null);
     }
+  };
+
+  const toggleExpandJob = (jobId) => {
+    setExpandedJobId(expandedJobId === jobId ? null : jobId);
   };
 
   if (loading) {
@@ -156,7 +164,7 @@ export default function WorkerDashboard() {
           <div className="flex items-center justify-between border-b border-slate-200 pb-2">
             <div className="flex gap-2">
               <button
-                onClick={() => setActiveTab('active')}
+                onClick={() => { setActiveTab('active'); setExpandedJobId(null); }}
                 className={`text-xs font-bold pb-2.5 px-1 relative transition whitespace-nowrap cursor-pointer ${
                   activeTab === 'active' ? 'text-blue-600' : 'text-slate-400 hover:text-slate-800'
                 }`}
@@ -165,7 +173,7 @@ export default function WorkerDashboard() {
                 {activeTab === 'active' && <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-600 rounded-full" />}
               </button>
               <button
-                onClick={() => setActiveTab('completed')}
+                onClick={() => { setActiveTab('completed'); setExpandedJobId(null); }}
                 className={`text-xs font-bold pb-2.5 px-1 relative transition whitespace-nowrap cursor-pointer ${
                   activeTab === 'completed' ? 'text-blue-600' : 'text-slate-400 hover:text-slate-800'
                 }`}
@@ -183,7 +191,7 @@ export default function WorkerDashboard() {
             </button>
           </div>
 
-          {/* Contextual Table Stream Cards */}
+          {/* Streamlining Contextual Structural Stream Cards */}
           <div className="space-y-4">
             {jobFeed?.length === 0 ? (
               <div className="bg-white border border-slate-200 rounded-2xl p-12 text-center text-xs font-medium text-slate-400 shadow-xs">
@@ -191,62 +199,40 @@ export default function WorkerDashboard() {
               </div>
             ) : (
               jobFeed?.map((item) => (
-                <div 
-                  key={item.job_id}
-                  className="bg-white border border-slate-200 rounded-2xl p-5 shadow-xs flex flex-col sm:flex-row justify-between sm:items-center gap-4 hover:border-slate-300 transition"
-                >
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <h4 className="font-bold text-slate-900 hover:text-blue-600 transition cursor-pointer text-sm sm:text-base" onClick={() => navigate(`/jobs/${item.job_id}`)}>
-                        {item.title}
-                      </h4>
-                      <span className={`text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded border ${
-                        item.status === 'pending_confirmation' ? 'bg-amber-50 text-amber-700 border-amber-200 animate-pulse' :
-                        item.status === 'accepted' ? 'bg-blue-50 text-blue-700 border-blue-200' :
-                        item.status === 'completed' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
-                        'bg-slate-50 text-slate-500 border-slate-200'
-                      }`}>
-                        {item.status?.replace(/_/g, ' ')}
+                <div key={item.job_id} className="space-y-3">
+                  {/* Custom Modular Card Rendering Layer */}
+                  <WorkersJobCard 
+                    job={item}
+                    isExpanded={expandedJobId === item.job_id}
+                    onToggleExpand={() => toggleExpandJob(item.job_id)}
+                  />
+
+                  {/* Operational Management Row attached to active task execution hooks */}
+                  {expandedJobId === item.job_id && (item.status === 'accepted' || item.status === 'pending_confirmation') && (
+                    <div className="bg-slate-100/70 border border-slate-200/60 rounded-xl p-4 flex items-center justify-between mx-2 animate-fade-in">
+                      <span className="text-xs font-bold text-slate-500">
+                        {item.status === 'accepted' 
+                          ? 'Finished field operational tasks? Notify the hiring agent:' 
+                          : 'Operational execution completed. Awaiting client dashboard closure confirmation.'}
                       </span>
+                      
+                      {item.status === 'accepted' && (
+                        <button
+                          disabled={submittingId === item.job_id}
+                          onClick={() => handleMarkFinished(item.job_id)}
+                          className="bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-300 text-white text-xs font-bold px-4 py-2 rounded-xl transition active:scale-98 cursor-pointer shadow-xs"
+                        >
+                          {submittingId === item.job_id ? 'Processing...' : 'Mark Execution Complete'}
+                        </button>
+                      )}
+
+                      {item.status === 'pending_confirmation' && (
+                        <span className="text-[11px] font-bold text-amber-700 bg-amber-50 border border-amber-200 px-3 py-1.5 rounded-xl animate-pulse">
+                          ⚠️ Awaiting Signoff
+                        </span>
+                      )}
                     </div>
-                    <p className="text-xs text-slate-400 font-medium">
-                      Client Account Anchor: <span className="text-slate-700 font-bold">{item.client_name}</span>
-                    </p>
-
-                    {/* Review Callout Section for Completed Deployments */}
-                    {item.review && (
-                      <div className="mt-2 bg-slate-50 border border-slate-100 rounded-xl p-3 text-xs max-w-xl">
-                        <div className="flex items-center gap-1 font-bold text-amber-500 mb-0.5">
-                          {'★'.repeat(item.review.rating)}
-                          <span className="text-slate-400 font-medium text-[10px] ml-1">Client Feedback Record</span>
-                        </div>
-                        <p className="text-slate-600 italic font-medium">"{item.review.comment || 'No textual metrics supplied.'}"</p>
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="flex sm:flex-col items-center sm:items-end justify-between sm:justify-start gap-3 shrink-0 pt-3 sm:pt-0 border-t sm:border-t-0 border-slate-100">
-                    <div className="sm:text-right">
-                      <span className="text-[10px] font-bold text-slate-400 block uppercase tracking-wider">Gross Value</span>
-                      <span className="text-lg font-black text-slate-900">${item.budget}</span>
-                    </div>
-
-                    {item.status === 'accepted' && (
-                      <button
-                        disabled={submittingId === item.job_id}
-                        onClick={() => handleMarkFinished(item.job_id)}
-                        className="bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-300 text-white text-xs font-bold px-4 py-2 rounded-xl transition active:scale-98 cursor-pointer shadow-xs"
-                      >
-                        {submittingId === item.job_id ? 'Processing...' : 'Mark Execution Complete'}
-                      </button>
-                    )}
-                    
-                    {item.status === 'pending_confirmation' && (
-                      <span className="text-[11px] font-bold text-slate-400 italic bg-slate-50 border border-slate-100 px-3 py-1.5 rounded-xl">
-                        Awaiting Client Signoff
-                      </span>
-                    )}
-                  </div>
+                  )}
                 </div>
               ))
             )}

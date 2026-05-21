@@ -84,5 +84,21 @@ export const clientApi = {
     });
     if (!res.ok) throw new Error('Fulfillment confirmation failed');
     return res.json();
+  },
+
+  // ==========================================
+  // SUBMIT CLIENT EVALUATION FEEDBACK
+  // ==========================================
+  submitReview: async (jobId, reviewData) => {
+    const res = await fetch(`${API_BASE_URL}/jobs/${jobId}/review`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify(reviewData)
+    });
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.error || 'Failed to submit evaluation review');
+    }
+    return res.json();
   }
 };

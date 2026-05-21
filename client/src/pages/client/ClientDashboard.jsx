@@ -20,6 +20,11 @@ export default function ClientDashboard() {
   // Selected focused context for reviewing applicants
   const [focusedJob, setFocusedJob] = useState(null);
 
+  // --- NEW: Review Modal & Form States ---
+  const [focusedReviewJob, setFocusedReviewJob] = useState(null);
+  const [reviewForm, setReviewForm] = useState({ rating: 5, comment: '' });
+  const [reviewSubmitLoading, setReviewSubmitLoading] = useState(false);
+
   useEffect(() => {
     loadDashboardData();
   }, []);
@@ -111,6 +116,26 @@ export default function ClientDashboard() {
       loadDashboardData();
     } catch (err) {
       alert(err.message);
+    }
+  };
+
+  // --- NEW: Submit Review Handler ---
+  const handleReviewSubmit = async (e) => {
+    e.preventDefault();
+    try {
+      setReviewSubmitLoading(true);
+      // Assumes your clientApi has a submitReview method taking (jobId, { rating, comment })
+      await clientApi.submitReview(focusedReviewJob.job_id, {
+        rating: Number(reviewForm.rating),
+        comment: reviewForm.comment
+      });
+      setFocusedReviewJob(null);
+      setReviewForm({ rating: 5, comment: '' });
+      loadDashboardData();
+    } catch (err) {
+      alert(err.message);
+    } finally {
+      setReviewSubmitLoading(false);
     }
   };
 
@@ -336,11 +361,22 @@ export default function ClientDashboard() {
                               <p className="text-xs text-slate-500 italic leading-relaxed">"{job.review.comment || 'No written summary parameters provided.'}"</p>
                             </div>
                           ) : (
-                            <p className="text-xs font-semibold text-slate-400 italic">
-                              {job.status === 'completed' 
-                                ? 'No evaluation feedback loop submitted for this position listing.' 
-                                : 'Feedback loops unlock once milestones achieve full closure.'}
-                            </p>
+                            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                              <p className="text-xs font-semibold text-slate-400 italic">
+                                {job.status === 'completed' 
+                                  ? 'No evaluation feedback loop submitted for this position listing.' 
+                                  : 'Feedback loops unlock once milestones achieve full closure.'}
+                              </p>
+                              {/* --- NEW: Leave Review Trigger Button --- */}
+                              {job.status === 'completed' && (
+                                <button
+                                  onClick={(e) => { e.stopPropagation(); setFocusedReviewJob(job); }}
+                                  className="bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs px-3 py-2 rounded-xl transition duration-150 active:scale-98"
+                                >
+                                  Write Review ⭐
+                                </button>
+                              )}
+                            </div>
                           )}
                         </div>
                       </div>
@@ -441,6 +477,76 @@ export default function ClientDashboard() {
                 </div>
               ))}
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* --- NEW: MODAL WINDOW C: CLIENT FEEDBACK LEAVE REVIEW FORM --- */}
+      {focusedReviewJob && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+          <div className="bg-white max-w-md w-full rounded-2xl p-6 shadow-xl border border-slate-100 flex flex-col">
+            <div className="flex justify-between items-center pb-4 border-b border-slate-100">
+              <div>
+                <h2 className="text-lg font-black text-slate-900 tracking-tight">Leave a Review</h2>
+                <p className="text-xs text-slate-400 font-medium mt-0.5">For: {focusedReviewJob.title}</p>
+              </div>
+              <button 
+                onClick={() => { setFocusedReviewJob(null); setReviewForm({ rating: 5, comment: '' }); }} 
+                className="text-slate-400 text-2xl hover:text-slate-600 transition focus:outline-hidden"
+              >
+                ×
+              </button>
+            </div>
+
+            <form onSubmit={handleReviewSubmit} className="space-y-4 pt-4">
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1">Rating</label>
+                <div className="flex items-center gap-2">
+                  {[1, 2, 3, 4, 5].map((num) => (
+                    <button
+                      key={num}
+                      type="button"
+                      onClick={() => setReviewForm({ ...reviewForm, rating: num })}
+                      className={`text-2xl transition-all duration-150 ${
+                        num <= reviewForm.rating ? 'text-amber-400 scale-110' : 'text-slate-200 hover:text-slate-300'
+                      }`}
+                    >
+                      ★
+                    </button>
+                  ))}
+                  <span className="text-sm font-bold text-slate-600 ml-2">{reviewForm.rating}.0 / 5.0</span>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1">Review Comments</label>
+                <textarea
+                  required
+                  rows={4}
+                  className="w-full border border-slate-200 rounded-xl p-3 text-sm focus:outline-hidden focus:border-blue-600 resize-none transition bg-slate-50/30"
+                  placeholder="Share your experience working with this service worker..."
+                  value={reviewForm.comment}
+                  onChange={(e) => setReviewForm({ ...reviewForm, comment: e.target.value })}
+                />
+              </div>
+
+              <div className="flex gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => { setFocusedReviewJob(null); setReviewForm({ rating: 5, comment: '' }); }}
+                  className="flex-1 border border-slate-200 text-slate-500 font-bold text-xs py-3 rounded-xl transition hover:bg-slate-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={reviewSubmitLoading}
+                  className="flex-1 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-200 text-white font-bold text-xs py-3 rounded-xl transition shadow-xs active:scale-98"
+                >
+                  {reviewSubmitLoading ? 'Submitting...' : 'Submit Evaluation'}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

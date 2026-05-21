@@ -141,6 +141,44 @@ def create_review(job_id):
         "message": "Review submitted successfully"
     }), 201
 
+# =========================
+# GET JOBS AWAITING REVIEW
+# =========================
+@review_bp.route("/jobs/pending-review", methods=["GET"])
+@jwt_required()
+def get_jobs_pending_review():
+    """
+    Returns a clean list of completed jobs owned by the current client 
+    that have NOT been reviewed yet. Perfect for dedicated UI view sections.
+    """
+    current_user_id = int(get_jwt_identity())
+    
+    # Query completed jobs belonging to client where NO matching review exists
+    unreviewed_completed_jobs = (
+        db.session.query(Job)
+        .filter(Job.client_id == current_user_id)
+        .filter(Job.status == "completed")
+        .outerjoin(Review, Job.id == Review.job_id)
+        .filter(Review.id == None)
+        .all()
+    )
+
+    return jsonify([
+        {
+            "job_id": job.id,
+            "title": job.title,
+            "budget": job.budget,
+            "category": job.category,
+            "location_text": job.location_text,
+            "status": job.status,
+            "worker": {
+                "id": job.worker_id,
+                "name": job.worker.name if job.worker else "Unknown Contractor"
+            } if job.worker_id else None
+        }
+        for job in unreviewed_completed_jobs
+    ]), 200
+
 
 # =========================
 # GET WORKER REVIEWS

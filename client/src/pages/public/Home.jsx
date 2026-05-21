@@ -4,13 +4,17 @@ import { useAuth } from '../../context/AuthContext';
 import Navbar from '../../components/Navbar';
 
 export default function Home() {
-  const { token } = useAuth();
+  const { token, user } = useAuth();
   const navigate = useNavigate();
   const [showGetStarted, setShowGetStarted] = useState(false);
   const [activeTab, setActiveTab] = useState('client');
   
   // Create a ref to smoothly target the onboarding portal panel
   const portalRef = useRef(null);
+
+  // Core role boolean evaluations for layout branching
+  const isClient = user?.role === 'client';
+  const isWorker = user?.role === 'worker';
 
   const handleTriggerGetStarted = () => {
     setShowGetStarted(true);
@@ -39,7 +43,7 @@ export default function Home() {
           <svg className="w-3.5 h-3.5 text-blue-600 animate-pulse" fill="currentColor" viewBox="0 0 24 24">
             <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
           </svg>
-          An Easier Way to Get Things Done
+          {token ? `Welcome Back, ${user?.name || 'Partner'}` : 'An Easier Way to Get Things Done'}
         </span>
         
         <h1 className="text-4xl sm:text-6xl font-black text-slate-900 tracking-tight leading-[1.05] mb-6 max-w-4xl mx-auto">
@@ -53,61 +57,99 @@ export default function Home() {
 
         {/* Hero Interactive Entry Portal */}
         <div ref={portalRef} className="transition-all duration-500 ease-in-out">
-          {!showGetStarted ? (
-            <div className="flex justify-center gap-4 flex-wrap items-center">
-              <button
-                onClick={handleTriggerGetStarted}
-                className="bg-slate-950 text-white font-bold text-base px-8 py-4 rounded-2xl hover:bg-slate-800 transition-all duration-200 transform hover:-translate-y-0.5 active:scale-98 shadow-xl shadow-slate-950/15 focus:outline-hidden"
-              >
-                Get Started Today
-              </button>
-              <button
-                onClick={() => navigate('/browse-jobs')}
-                className="bg-white text-slate-800 border border-slate-200 font-bold text-base px-8 py-4 rounded-2xl hover:bg-slate-50 hover:border-slate-300 transition-all duration-200 shadow-xs focus:outline-hidden"
-              >
-                View Live Jobs
-              </button>
+          {token ? (
+            /* --- AUTHENTICATED USER SHORTCUT LINKS --- */
+            <div className="flex justify-center gap-4 flex-wrap items-center animate-[fadeIn_0.15s_ease-out]">
+              {isClient ? (
+                <>
+                  <button
+                    onClick={() => navigate('/client/post-job')}
+                    className="bg-blue-600 text-white font-bold text-base px-8 py-4 rounded-2xl hover:bg-blue-700 transition-all duration-200 transform hover:-translate-y-0.5 active:scale-98 shadow-xl shadow-blue-600/15 focus:outline-hidden"
+                  >
+                    Post a New Task
+                  </button>
+                  <button
+                    onClick={() => navigate('/client/dashboard')}
+                    className="bg-white text-slate-800 border border-slate-200 font-bold text-base px-8 py-4 rounded-2xl hover:bg-slate-50 hover:border-slate-300 transition-all duration-200 shadow-xs focus:outline-hidden"
+                  >
+                    Manage Assignments
+                  </button>
+                </>
+              ) : (
+                <>
+                  <button
+                    onClick={() => navigate('/browse-jobs')}
+                    className="bg-indigo-600 text-white font-bold text-base px-8 py-4 rounded-2xl hover:bg-indigo-700 transition-all duration-200 transform hover:-translate-y-0.5 active:scale-98 shadow-xl shadow-indigo-600/15 focus:outline-hidden"
+                  >
+                    Browse Active Marketplace
+                  </button>
+                  <button
+                    onClick={() => navigate('/worker/dashboard')}
+                    className="bg-white text-slate-800 border border-slate-200 font-bold text-base px-8 py-4 rounded-2xl hover:bg-slate-50 hover:border-slate-300 transition-all duration-200 shadow-xs focus:outline-hidden"
+                  >
+                    View My Pitches
+                  </button>
+                </>
+              )}
             </div>
           ) : (
-            <div className="bg-white border border-slate-200 rounded-3xl p-6 sm:p-8 max-w-xl mx-auto shadow-2xl shadow-slate-200/80 transition-all duration-300 scale-100 animate-[fadeIn_0.2s_ease-out]">
-              <div className="flex justify-between items-center mb-6">
-                <p className="text-xs font-extrabold text-slate-400 uppercase tracking-widest">Select your pathway option</p>
-                <button 
-                  onClick={() => setShowGetStarted(false)}
-                  className="text-xs font-bold text-slate-400 hover:text-rose-500 transition-colors bg-slate-100 px-2.5 py-1 rounded-md"
+            /* --- GUEST / UNAUTHENTICATED USER ROUTE PORTAL --- */
+            !showGetStarted ? (
+              <div className="flex justify-center gap-4 flex-wrap items-center">
+                <button
+                  onClick={handleTriggerGetStarted}
+                  className="bg-slate-950 text-white font-bold text-base px-8 py-4 rounded-2xl hover:bg-slate-800 transition-all duration-200 transform hover:-translate-y-0.5 active:scale-98 shadow-xl shadow-slate-950/15 focus:outline-hidden"
                 >
-                  Cancel
+                  Get Started Today
+                </button>
+                <button
+                  onClick={() => navigate('/browse-jobs')}
+                  className="bg-white text-slate-800 border border-slate-200 font-bold text-base px-8 py-4 rounded-2xl hover:bg-slate-50 hover:border-slate-300 transition-all duration-200 shadow-xs focus:outline-hidden"
+                >
+                  View Live Jobs
                 </button>
               </div>
-              
-              <div className="grid sm:grid-cols-2 gap-4">
-                <button
-                  onClick={() => handleGetStarted('client')}
-                  className="flex flex-col items-center justify-center p-6 bg-slate-50 border border-slate-200 rounded-2xl hover:border-blue-500 hover:bg-blue-50/20 group transition-all duration-200 text-center cursor-pointer focus:outline-hidden active:scale-99"
-                >
-                  <div className="w-12 h-12 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center mb-4 group-hover:scale-110 group-hover:bg-blue-600 group-hover:text-white transition-all duration-200 shadow-2xs">
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
-                    </svg>
-                  </div>
-                  <span className="font-extrabold text-slate-900 text-base">I want to Hire</span>
-                  <span className="text-xs text-slate-500 mt-2 leading-normal font-medium">Post tasks and secure matching helpers quickly</span>
-                </button>
+            ) : (
+              <div className="bg-white border border-slate-200 rounded-3xl p-6 sm:p-8 max-w-xl mx-auto shadow-2xl shadow-slate-200/80 transition-all duration-300 scale-100 animate-[fadeIn_0.2s_ease-out]">
+                <div className="flex justify-between items-center mb-6">
+                  <p className="text-xs font-extrabold text-slate-400 uppercase tracking-widest">Select your pathway option</p>
+                  <button 
+                    onClick={() => setShowGetStarted(false)}
+                    className="text-xs font-bold text-slate-400 hover:text-rose-500 transition-colors bg-slate-100 px-2.5 py-1 rounded-md"
+                  >
+                    Cancel
+                  </button>
+                </div>
+                
+                <div className="grid sm:grid-cols-2 gap-4">
+                  <button
+                    onClick={() => handleGetStarted('client')}
+                    className="flex flex-col items-center justify-center p-6 bg-slate-50 border border-slate-200 rounded-2xl hover:border-blue-500 hover:bg-blue-50/20 group transition-all duration-200 text-center cursor-pointer focus:outline-hidden active:scale-99"
+                  >
+                    <div className="w-12 h-12 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center mb-4 group-hover:scale-110 group-hover:bg-blue-600 group-hover:text-white transition-all duration-200 shadow-2xs">
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+                      </svg>
+                    </div>
+                    <span className="font-extrabold text-slate-900 text-base">I want to Hire</span>
+                    <span className="text-xs text-slate-500 mt-2 leading-normal font-medium">Post tasks and secure matching helpers quickly</span>
+                  </button>
 
-                <button
-                  onClick={() => handleGetStarted('worker')}
-                  className="flex flex-col items-center justify-center p-6 bg-slate-50 border border-slate-200 rounded-2xl hover:border-indigo-500 hover:bg-indigo-50/20 group transition-all duration-200 text-center cursor-pointer focus:outline-hidden active:scale-99"
-                >
-                  <div className="w-12 h-12 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center mb-4 group-hover:scale-110 group-hover:bg-indigo-600 group-hover:text-white transition-all duration-200 shadow-2xs">
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.907c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.381-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z"/>
-                    </svg>
-                  </div>
-                  <span className="font-extrabold text-slate-900 text-base">I want to Earn</span>
-                  <span className="text-xs text-slate-500 mt-2 leading-normal font-medium">Claim dynamic gig listings around your schedule</span>
-                </button>
+                  <button
+                    onClick={() => handleGetStarted('worker')}
+                    className="flex flex-col items-center justify-center p-6 bg-slate-50 border border-slate-200 rounded-2xl hover:border-indigo-500 hover:bg-indigo-50/20 group transition-all duration-200 text-center cursor-pointer focus:outline-hidden active:scale-99"
+                  >
+                    <div className="w-12 h-12 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center mb-4 group-hover:scale-110 group-hover:bg-indigo-600 group-hover:text-white transition-all duration-200 shadow-2xs">
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.907c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.381-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z"/>
+                      </svg>
+                    </div>
+                    <span className="font-extrabold text-slate-900 text-base">I want to Earn</span>
+                    <span className="text-xs text-slate-500 mt-2 leading-normal font-medium">Claim dynamic gig listings around your schedule</span>
+                  </button>
+                </div>
               </div>
-            </div>
+            )
           )}
         </div>
       </header>
