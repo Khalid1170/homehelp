@@ -7,7 +7,7 @@ import Home from '../pages/public/Home';
 import Login from '../pages/auth/Login';
 import Register from '../pages/auth/Register';
 import BrowseJobs from '../pages/public/BrowseJobs';
-import JobFullDetails from '../pages/public/JobFullDetails'; // 👈 Added Detail Page Import
+import JobFullDetails from '../pages/public/JobFullDetails';
 
 // 💼 Client Page Imports
 import ClientDashboard from '../pages/client/ClientDashboard';
@@ -15,10 +15,12 @@ import CreateJob from '../pages/client/CreateJob';
 
 // 🛠️ Worker Page Imports
 import WorkerDashboard from '../pages/worker/WorkerDashboard';
-import JobPitchForm from '../pages/worker/JobPitchForm'; // 👈 Added Worker Pitch Import
+import JobPitchForm from '../pages/worker/JobPitchForm';
 
 // 📊 Admin Page Imports
 import AdminDashboard from '../pages/admin/AdminDashboard';
+import AdminPayoutDashboard from '../pages/admin/AdminPayoutDashboard'; // 👈 FIXED: Unified import relative path syntax
+
 
 // 🛡️ Protected Route Gatekeeper
 function ProtectedRoute({ children, allowedRoles }) {
@@ -79,6 +81,13 @@ export default function AppRoutes() {
       <Route path="/admin/dashboard" element={
         <ProtectedRoute allowedRoles={['admin']}>
           <AdminDashboard />
+        </ProtectedRoute>
+      } />
+      
+      {/* 💰 NEW: Integrated Escrow Balance & Payout Management Panel */}
+      <Route path="/admin/payouts" element={
+        <ProtectedRoute allowedRoles={['admin']}>
+          <AdminPayoutDashboard />
         </ProtectedRoute>
       } />
 

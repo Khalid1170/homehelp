@@ -6,6 +6,6 @@
 # from .review import Review
 
 from .user import User
-from .worker import Worker
+from .worker import Worker, PayoutRequest
 from .job import Job, JobApplication
 from .review import Review

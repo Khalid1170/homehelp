@@ -3,6 +3,16 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import Navbar from '../../components/Navbar';
 import WorkersJobCard from '../../components/WorkersJobCard';
+import { 
+  Briefcase, 
+  DollarSign, 
+  TrendingUp, 
+  Percent, 
+  Wallet, 
+  Clock, 
+  CheckCircle,
+  HelpCircle
+} from 'lucide-react';
 
 export default function WorkerDashboard() {
   const { token, logout } = useAuth();
@@ -139,23 +149,97 @@ export default function WorkerDashboard() {
           </div>
         </header>
 
+        {/* 💳 NEW SECTION: Interactive Payout Wallet Ecosystem */}
+        <section className="bg-white border border-slate-200/80 rounded-2xl shadow-xs overflow-hidden">
+          <div className="p-5 border-b border-slate-100 bg-slate-50/50 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Wallet className="w-4 h-4 text-slate-500" />
+              <h3 className="text-sm font-bold text-slate-900">Financial Disbursal Balance Accounts</h3>
+            </div>
+            <span className="text-[10px] font-bold uppercase tracking-wider bg-white px-2 py-1 rounded-md border border-slate-200 text-slate-500">
+              Stripe Connected
+            </span>
+          </div>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 divide-y md:divide-y-0 md:divide-x divide-slate-100">
+            {/* Wallet Column 1: Liquid Capital Balance */}
+            <div className="p-6 flex items-start gap-4">
+              <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 border border-emerald-100 flex items-center justify-center shrink-0">
+                <CheckCircle className="w-5 h-5" />
+              </div>
+              <div className="space-y-2 flex-1">
+                <div>
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Available Balance</span>
+                  <span className="text-3xl font-black text-slate-900 mt-0.5 block">
+                    ${worker_info?.available_balance?.toFixed(2) || '0.00'}
+                  </span>
+                </div>
+                <p className="text-xs text-slate-500 leading-relaxed font-medium">
+                  Liquid compensation released directly from cleared milestones. Expand completed contracts below to submit a payout extraction routing order.
+                </p>
+              </div>
+            </div>
+
+            {/* Wallet Column 2: Escrow Matrix Balance */}
+            <div className="p-6 flex items-start gap-4">
+              <div className="w-10 h-10 rounded-xl bg-amber-50 text-amber-600 border border-amber-100 flex items-center justify-center shrink-0">
+                <Clock className="w-5 h-5" />
+              </div>
+              <div className="space-y-2 flex-1">
+                <div>
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Pending Processing Queue</span>
+                  <span className="text-3xl font-black text-amber-600 mt-0.5 block">
+                    ${worker_info?.pending_balance?.toFixed(2) || '0.00'}
+                  </span>
+                </div>
+                <p className="text-xs text-slate-500 leading-relaxed font-medium">
+                  Capital committed to outstanding extraction actions awaiting administrative batch verification and routing settlements.
+                </p>
+              </div>
+            </div>
+          </div>
+        </section>
+
         {/* Financial Metrics Summary Strip */}
         <section className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          <div className="bg-white border border-slate-200/80 rounded-2xl p-4.5 shadow-xs">
-            <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">Completed Pools</span>
-            <span className="text-2xl font-black text-slate-900">{stats?.jobs_completed}</span>
+          <div className="bg-white border border-slate-200/80 rounded-2xl p-4.5 shadow-xs flex items-center gap-3.5">
+            <div className="p-2 bg-slate-50 rounded-lg text-slate-500 border border-slate-100 shrink-0">
+              <Briefcase className="w-4 h-4" />
+            </div>
+            <div>
+              <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-400">Completed Pools</span>
+              <span className="text-xl font-black text-slate-900">{stats?.jobs_completed}</span>
+            </div>
           </div>
-          <div className="bg-white border border-slate-200/80 rounded-2xl p-4.5 shadow-xs">
-            <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">Gross Invoiced</span>
-            <span className="text-2xl font-black text-slate-900">${stats?.gross_earnings?.toFixed(2)}</span>
+          
+          <div className="bg-white border border-slate-200/80 rounded-2xl p-4.5 shadow-xs flex items-center gap-3.5">
+            <div className="p-2 bg-slate-50 rounded-lg text-slate-500 border border-slate-100 shrink-0">
+              <TrendingUp className="w-4 h-4" />
+            </div>
+            <div>
+              <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-400">Gross Invoiced</span>
+              <span className="text-xl font-black text-slate-900">${stats?.gross_earnings?.toFixed(2)}</span>
+            </div>
           </div>
-          <div className="bg-white border border-slate-200/80 rounded-2xl p-4.5 shadow-xs">
-            <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">Platform Cut (15%)</span>
-            <span className="text-2xl font-black text-slate-400">-${stats?.platform_fees?.toFixed(2)}</span>
+
+          <div className="bg-white border border-slate-200/80 rounded-2xl p-4.5 shadow-xs flex items-center gap-3.5">
+            <div className="p-2 bg-slate-50 rounded-lg text-slate-400 border border-slate-100 shrink-0">
+              <Percent className="w-4 h-4" />
+            </div>
+            <div>
+              <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-400">Platform Fee (15%)</span>
+              <span className="text-xl font-black text-slate-400">-${stats?.platform_fees?.toFixed(2)}</span>
+            </div>
           </div>
-          <div className="bg-white border border-slate-200/80 rounded-2xl p-4.5 shadow-xs border-l-3 border-l-emerald-500">
-            <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">Net Take Home Payout</span>
-            <span className="text-2xl font-black text-emerald-600">${stats?.net_earnings?.toFixed(2)}</span>
+
+          <div className="bg-white border border-slate-200/80 rounded-2xl p-4.5 shadow-xs border-l-3 border-l-emerald-500 flex items-center gap-3.5">
+            <div className="p-2 bg-emerald-50 rounded-lg text-emerald-600 border border-emerald-100 shrink-0">
+              <DollarSign className="w-4 h-4" />
+            </div>
+            <div>
+              <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-400">Total Net Yield</span>
+              <span className="text-xl font-black text-emerald-600">${stats?.net_earnings?.toFixed(2)}</span>
+            </div>
           </div>
         </section>
 
@@ -227,8 +311,9 @@ export default function WorkerDashboard() {
                       )}
 
                       {item.status === 'pending_confirmation' && (
-                        <span className="text-[11px] font-bold text-amber-700 bg-amber-50 border border-amber-200 px-3 py-1.5 rounded-xl animate-pulse">
-                          ⚠️ Awaiting Signoff
+                        <span className="inline-flex items-center gap-1.5 text-[11px] font-bold text-amber-700 bg-amber-50 border border-amber-200 px-3 py-1.5 rounded-xl animate-pulse">
+                          <HelpCircle className="w-3.5 h-3.5 text-amber-500" />
+                          Awaiting Signoff
                         </span>
                       )}
                     </div>

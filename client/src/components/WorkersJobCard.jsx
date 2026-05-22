@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { 
   MapPin, 
   Tag, 
@@ -8,10 +8,49 @@ import {
   Info, 
   User, 
   DollarSign, 
-  Briefcase 
+  Briefcase,
+  Loader2,
+  CheckCircle2
 } from 'lucide-react';
 
 export default function WorkersJobCard({ job, isExpanded, onToggleExpand }) {
+  const [requesting, setRequesting] = useState(false);
+  const [payoutRequestedLocal, setPayoutRequestedLocal] = useState(job.payout_requested || false);
+
+  const handleRequestPayout = async (e) => {
+    e.stopPropagation(); // Avoid triggering the main card expand/collapse toggle
+    
+    if (!window.confirm(`Submit systematic authorization request to withdraw $${job.budget} from your available balance?`)) {
+      return;
+    }
+
+    setRequesting(true);
+    try {
+      const token = localStorage.getItem('token'); // Retrieve auth context matrix token
+      const res = await fetch('http://localhost:5000/worker/request-payout', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ amount: job.budget })
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || 'The transaction processing engine encountered an operational failure.');
+      }
+
+      alert('Payout state committed. Funds transferred safely to pending processing queue.');
+      setPayoutRequestedLocal(true);
+    } catch (err) {
+      alert(`Payout Execution Exception: ${err.message}`);
+    } finally {
+      setRequesting(false);
+    }
+  };
+
   return (
     <div 
       className={`bg-white rounded-2xl border transition-all duration-300 overflow-hidden cursor-pointer select-none ${
@@ -120,7 +159,7 @@ export default function WorkersJobCard({ job, isExpanded, onToggleExpand }) {
           {/* Segment 2: Financial Ledger Matrix */}
           <div className="space-y-1.5">
             <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400">Contract Financial Matrix</h4>
-            <div className="bg-white border border-slate-200/60 rounded-xl p-4 shadow-2xs flex items-center justify-between">
+            <div className="bg-white border border-slate-200/60 rounded-xl p-4 shadow-2xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
               <div className="flex items-center gap-3">
                 <div className="w-8 h-8 rounded-lg bg-emerald-50 flex items-center justify-center text-emerald-600">
                   <DollarSign className="w-4 h-4" />
@@ -130,14 +169,38 @@ export default function WorkersJobCard({ job, isExpanded, onToggleExpand }) {
                   <p className="text-base font-black text-slate-900 mt-0.5">${job.budget}</p>
                 </div>
               </div>
-              <div>
-                <span className={`text-xs font-bold px-3 py-1 rounded-lg inline-block border uppercase tracking-wider ${
-                  job.status === 'completed' 
-                    ? 'bg-emerald-50 text-emerald-700 border-emerald-100' 
-                    : 'bg-blue-50 text-blue-700 border-blue-100'
-                }`}>
-                  {job.status === 'completed' ? 'Settled & Released' : 'Held securely in Escrow'}
-                </span>
+              
+              <div className="w-full sm:w-auto flex items-center justify-end">
+                {job.status === 'completed' ? (
+                  payoutRequestedLocal ? (
+                    <span className="inline-flex items-center gap-1.5 text-xs font-bold px-3 py-2 rounded-xl border bg-amber-50 text-amber-700 border-amber-200 uppercase tracking-wider">
+                      <Clock className="w-3.5 h-3.5 animate-pulse" />
+                      Payout Pending Processing
+                    </span>
+                  ) : (
+                    <button
+                      onClick={handleRequestPayout}
+                      disabled={requesting}
+                      className="w-full sm:w-auto text-xs bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-100 text-white disabled:text-slate-400 font-bold px-4 py-2.5 rounded-xl transition cursor-pointer inline-flex items-center justify-center gap-2 shadow-sm shadow-emerald-700/10"
+                    >
+                      {requesting ? (
+                        <>
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                          Submitting Pipeline Data...
+                        </>
+                      ) : (
+                        <>
+                          <CheckCircle2 className="w-3.5 h-3.5" />
+                          Request Funds Release
+                        </>
+                      )}
+                    </button>
+                  )
+                ) : (
+                  <span className="text-xs font-bold px-3 py-1 rounded-lg inline-block border uppercase tracking-wider bg-blue-50 text-blue-700 border-blue-100">
+                    Held securely in Escrow
+                  </span>
+                )}
               </div>
             </div>
           </div>

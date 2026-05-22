@@ -1017,7 +1017,7 @@ import stripe
 
 from app.extensions import db
 # 1. Added JobApplication to the model imports
-from app.models import Job, Worker, User, Review, JobApplication
+from app.models import Job, Worker, User, Review, JobApplication, PayoutRequest
 
 job_bp = Blueprint("job_bp", __name__)
 
@@ -1414,7 +1414,6 @@ def mark_job_finished(job_id):
 
     return jsonify({"message": "Job marked as finished"}), 200
 
-
 # =========================
 # CLIENT CONFIRMS COMPLETION
 # =========================
@@ -1445,26 +1444,85 @@ def confirm_job_completion(job_id):
     if not worker:
         return jsonify({"error": "Worker not found"}), 404
 
+    # =====================================
+    # MARK JOB COMPLETED
+    # =====================================
     job.status = "completed"
 
-    worker.total_jobs_completed = (worker.total_jobs_completed or 0) + 1
+    # =====================================
+    # JOB COUNTERS
+    # =====================================
+    worker.total_jobs_completed = (
+        worker.total_jobs_completed or 0
+    ) + 1
 
-    gross_amount = job.amount_paid or 0.0
+    # =====================================
+    # FINANCIAL CALCULATIONS
+    # =====================================
+    gross_amount = float(job.amount_paid or 0.0)
+
     platform_fee = round(gross_amount * 0.15, 2)
-    worker_payout = round(gross_amount - platform_fee, 2)
 
-    worker.total_gross_earnings = (worker.total_gross_earnings or 0.0) + gross_amount
-    worker.total_net_earnings = (worker.total_net_earnings or 0.0) + worker_payout
+    worker_payout = round(
+        gross_amount - platform_fee,
+        2
+    )
+
+    # =====================================
+    # WORKER LIFETIME TRACKING
+    # =====================================
+    worker.total_gross_earnings = (
+        worker.total_gross_earnings or 0.0
+    ) + gross_amount
+
+    worker.total_net_earnings = (
+        worker.total_net_earnings or 0.0
+    ) + worker_payout
+
+    # =====================================
+    # INTERNAL WALLET SYSTEM
+    # =====================================
+
+    # Funds available for withdrawal
+    worker.available_balance = (
+        worker.available_balance or 0.0
+    ) + worker_payout
+
+    # Optional future metric
+    worker.total_lifetime_earnings = (
+        worker.total_lifetime_earnings or 0.0
+    ) + worker_payout
+
+    # =====================================
+    # PLATFORM REVENUE TRACKING
+    # =====================================
+
+    current_platform_revenue = getattr(
+        current_app,
+        "platform_revenue",
+        0.0
+    )
+
+    current_app.platform_revenue = (
+        current_platform_revenue + platform_fee
+    )
 
     db.session.commit()
 
     return jsonify({
         "message": "Job completed successfully",
-        "total_client_paid": gross_amount,
-        "platform_fee_15_percent": platform_fee,
-        "worker_take_home": worker_payout
-    }), 200
 
+        "financial_summary": {
+            "total_client_paid": gross_amount,
+            "platform_fee_15_percent": platform_fee,
+            "worker_take_home": worker_payout
+        },
+
+        "worker_wallet": {
+            "available_balance": worker.available_balance,
+            "total_lifetime_earnings": worker.total_lifetime_earnings
+        }
+    }), 200
 
 # =========================
 # CREATE STRIPE CHECKOUT
@@ -1596,13 +1654,32 @@ def get_worker_dashboard():
         if review:
             review_data = {"rating": review.rating, "comment": review.comment}
 
+        # -------------------------------------------------------------
+        # DETERMINE WORKER-CENTRIC PAYOUT STATUS
+        # -------------------------------------------------------------
+        # If the client hasn't even paid the platform yet, it's unpaid.
+        # If the client paid, but the job isn't sealed/completed, it's in escrow.
+        # If the job is entirely closed and completed, the funds are settled and paid to worker.
+        if getattr(job, 'payment_status', None) != 'paid':
+            derived_payment_status = "unpaid"
+        elif job.status == "completed":
+            derived_payment_status = "paid"
+        else:
+            derived_payment_status = "escrow"
+
         job_data = {
             "job_id": job.id,
             "title": job.title,
             "budget": job.budget,
             "status": job.status,
             "client_name": client.full_name if client else "Unknown Client",
-            "review": review_data
+            "review": review_data,
+            
+            # FIXED: Added missing tracking variables requested by the UI components
+            "description": getattr(job, 'description', 'No details provided.'),
+            "location_text": getattr(job, 'location_text', 'Remote / On-Site'),
+            "category": getattr(job, 'category', 'General Support'),
+            "payment_status": derived_payment_status
         }
 
         if job.status == "completed":
@@ -1748,4 +1825,224 @@ def get_public_worker_profile(worker_id):
             }
             for r in reviews
         ]
+    }), 200
+
+# =========================
+# WORKER REQUEST PAYOUT
+# =========================
+@job_bp.route("/worker/request-payout", methods=["POST"])
+@jwt_required()
+def request_payout():
+
+    user = User.query.get(get_jwt_identity())
+
+    if not user:
+        return jsonify({
+            "error": "User not found"
+        }), 404
+
+    if user.role != "worker":
+        return jsonify({
+            "error": "Only workers can request payouts"
+        }), 403
+
+    worker = Worker.query.filter_by(
+        user_id=user.id
+    ).first()
+
+    if not worker:
+        return jsonify({
+            "error": "Worker profile not found"
+        }), 404
+
+    data = request.get_json() or {}
+
+    amount = data.get("amount")
+
+    if not amount:
+        return jsonify({
+            "error": "Amount is required"
+        }), 400
+
+    try:
+        amount = float(amount)
+    except:
+        return jsonify({
+            "error": "Invalid payout amount"
+        }), 400
+
+    if amount <= 0:
+        return jsonify({
+            "error": "Amount must be greater than 0"
+        }), 400
+
+    available_balance = worker.available_balance or 0.0
+
+    if amount > available_balance:
+        return jsonify({
+            "error": "Insufficient balance"
+        }), 400
+
+    if not worker.stripe_account_id:
+        return jsonify({
+            "error": "Stripe payout account not connected"
+        }), 400
+
+    payout_request = PayoutRequest(
+        worker_id=worker.id,
+        amount=amount,
+        stripe_account_id=worker.stripe_account_id,
+        status="pending"
+    )
+
+    # Hold funds immediately
+    worker.available_balance -= amount
+
+    worker.pending_balance = (
+        worker.pending_balance or 0.0
+    ) + amount
+
+    db.session.add(payout_request)
+
+    db.session.commit()
+
+    return jsonify({
+        "message": "Payout request submitted",
+        "request_id": payout_request.id,
+        "amount": amount
+    }), 201
+
+
+# =========================
+# ADMIN GET ALL PAYOUT REQUESTS
+# =========================
+@job_bp.route("/admin/payout-requests", methods=["GET"])
+@jwt_required()
+def get_all_payout_requests():
+
+    user = User.query.get(get_jwt_identity())
+
+    if not user:
+        return jsonify({
+            "error": "User not found"
+        }), 404
+
+    # Change this logic later if you build proper admin roles
+    if user.role != "admin":
+        return jsonify({
+            "error": "Unauthorized"
+        }), 403
+
+    payout_requests = PayoutRequest.query.order_by(
+        PayoutRequest.created_at.desc()
+    ).all()
+
+    results = []
+
+    for payout in payout_requests:
+
+        worker = Worker.query.get(
+            payout.worker_id
+        )
+
+        worker_name = "Unknown Worker"
+
+        if worker and worker.user:
+            worker_name = worker.user.full_name
+
+        results.append({
+            "id": payout.id,
+            "worker_id": payout.worker_id,
+            "worker_name": worker_name,
+            "amount": payout.amount,
+            "status": payout.status,
+            "payout_method": payout.payout_method,
+            "stripe_account_id": payout.stripe_account_id,
+            "stripe_transfer_id": payout.stripe_transfer_id,
+            "admin_notes": payout.admin_notes,
+            "created_at": (
+                payout.created_at.isoformat()
+                if payout.created_at
+                else None
+            ),
+            "processed_at": (
+                payout.processed_at.isoformat()
+                if payout.processed_at
+                else None
+            )
+        })
+
+    return jsonify(results), 200
+
+# =========================
+# ADMIN APPROVE PAYOUT
+# =========================
+@job_bp.route("/admin/payout-requests/<int:request_id>/approve", methods=["PATCH"])
+@jwt_required()
+def approve_payout_request(request_id):
+
+    user = User.query.get(get_jwt_identity())
+
+    if not user:
+        return jsonify({
+            "error": "User not found"
+        }), 404
+
+    if user.role != "admin":
+        return jsonify({
+            "error": "Unauthorized"
+        }), 403
+
+    payout_request = PayoutRequest.query.get(
+        request_id
+    )
+
+    if not payout_request:
+        return jsonify({
+            "error": "Payout request not found"
+        }), 404
+
+    if payout_request.status != "pending":
+        return jsonify({
+            "error": "Payout already processed"
+        }), 400
+
+    worker = Worker.query.get(
+        payout_request.worker_id
+    )
+
+    if not worker:
+        return jsonify({
+            "error": "Worker not found"
+        }), 404
+
+    # =========================================
+    # FUTURE STRIPE PAYOUT LOGIC GOES HERE
+    # =========================================
+    #
+    # Example:
+    #
+    # transfer = stripe.Transfer.create(
+    #     amount=int(payout_request.amount * 100),
+    #     currency="gbp",
+    #     destination=worker.stripe_account_id
+    # )
+    #
+    # payout_request.stripe_transfer_id = transfer.id
+    #
+    # =========================================
+
+    payout_request.status = "completed"
+
+    payout_request.processed_at = datetime.utcnow()
+
+    worker.pending_balance -= payout_request.amount
+
+    db.session.commit()
+
+    return jsonify({
+        "message": "Payout approved successfully",
+        "request_id": payout_request.id,
+        "amount": payout_request.amount,
+        "status": payout_request.status
     }), 200
