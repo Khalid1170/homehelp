@@ -16,6 +16,7 @@ import CreateJob from '../pages/client/CreateJob';
 // 🛠️ Worker Page Imports
 import WorkerDashboard from '../pages/worker/WorkerDashboard';
 import JobPitchForm from '../pages/worker/JobPitchForm';
+import StripeCallback from '../pages/worker/StripeCallback'; // 👈 ADDED: Stripe redirect callback component
 
 // 📊 Admin Page Imports
 import AdminDashboard from '../pages/admin/AdminDashboard';
@@ -74,6 +75,13 @@ export default function AppRoutes() {
       <Route path="/jobs/:id/pitch" element={
         <ProtectedRoute allowedRoles={['worker']}>
           <JobPitchForm />
+        </ProtectedRoute>
+      } />
+
+      {/* 💳 NEW: Onboarding Handshake Landings for Express Connect Accounts */}
+      <Route path="/stripe-callback" element={
+        <ProtectedRoute allowedRoles={['worker']}>
+          <StripeCallback />
         </ProtectedRoute>
       } />
 

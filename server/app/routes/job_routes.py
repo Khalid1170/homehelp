@@ -1695,6 +1695,7 @@ def get_worker_dashboard():
         "worker_info": {
             "worker_id": worker.id,
             "name": user.full_name,
+            "stripe_account_id": worker.stripe_account_id,
             "rating": worker.average_rating or 0.0,
             "verification_status": worker.verification_status
         },
@@ -1828,152 +1829,311 @@ def get_public_worker_profile(worker_id):
     }), 200
 
 # =========================
-# WORKER REQUEST PAYOUT
+# CONNECT STRIPE ACCOUNT
+# =========================
+@job_bp.route("/worker/connect-stripe", methods=["POST"])
+@jwt_required()
+def connect_stripe():
+
+    stripe.api_key = current_app.config["STRIPE_SECRET_KEY"]
+
+    user = User.query.get(get_jwt_identity())
+
+    if not user or user.role != "worker":
+        return jsonify({"error": "Unauthorized"}), 403
+
+    worker = Worker.query.filter_by(user_id=user.id).first()
+
+    if not worker:
+        return jsonify({"error": "Worker profile not found"}), 404
+
+    # Create account if worker does not yet have one
+    if not worker.stripe_account_id:
+
+        account = stripe.Account.create(
+            type="express",
+            country="GB",
+            email=user.email,
+            capabilities={
+                "transfers": {"requested": True}
+            }
+        )
+
+        worker.stripe_account_id = account.id
+        db.session.commit()
+
+    # Generate onboarding link
+    account_link = stripe.AccountLink.create(
+        account=worker.stripe_account_id,
+        refresh_url="http://localhost:5173/worker/dashboard",
+        return_url="http://localhost:5173/stripe-callback",
+        type="account_onboarding"
+    )
+
+    return jsonify({
+        "onboarding_url": account_link.url
+    }), 200
+
+
+# =========================
+# GET STRIPE STATUS
+# =========================
+@job_bp.route("/worker/stripe-status", methods=["GET"])
+@jwt_required()
+def stripe_status():
+
+    stripe.api_key = current_app.config["STRIPE_SECRET_KEY"]
+
+    user = User.query.get(get_jwt_identity())
+
+    if not user or user.role != "worker":
+        return jsonify({"error": "Unauthorized"}), 403
+
+    worker = Worker.query.filter_by(user_id=user.id).first()
+
+    if not worker:
+        return jsonify({"error": "Worker profile not found"}), 404
+
+    if not worker.stripe_account_id:
+        return jsonify({
+            "connected": False,
+            "charges_enabled": False,
+            "payouts_enabled": False
+        }), 200
+
+    account = stripe.Account.retrieve(worker.stripe_account_id)
+
+    return jsonify({
+        "connected": True,
+        "charges_enabled": account.charges_enabled,
+        "payouts_enabled": account.payouts_enabled
+    }), 200
+
+
+# # =========================
+# # WORKER REQUEST PAYOUT
+# # =========================
+# @job_bp.route("/worker/request-payout", methods=["POST"])
+# @jwt_required()
+# def request_payout():
+
+#     user = User.query.get(get_jwt_identity())
+
+#     if not user:
+#         return jsonify({
+#             "error": "User not found"
+#         }), 404
+
+#     if user.role != "worker":
+#         return jsonify({
+#             "error": "Only workers can request payouts"
+#         }), 403
+
+#     worker = Worker.query.filter_by(
+#         user_id=user.id
+#     ).first()
+
+#     if not worker:
+#         return jsonify({
+#             "error": "Worker profile not found"
+#         }), 404
+
+#     data = request.get_json() or {}
+
+#     amount = data.get("amount")
+
+#     if not amount:
+#         return jsonify({
+#             "error": "Amount is required"
+#         }), 400
+
+#     try:
+#         amount = float(amount)
+#     except:
+#         return jsonify({
+#             "error": "Invalid payout amount"
+#         }), 400
+
+#     if amount <= 0:
+#         return jsonify({
+#             "error": "Amount must be greater than 0"
+#         }), 400
+
+#     available_balance = worker.available_balance or 0.0
+
+#     if amount > available_balance:
+#         return jsonify({
+#             "error": "Insufficient balance"
+#         }), 400
+
+#     if not worker.stripe_account_id:
+#         return jsonify({
+#             "error": "Stripe payout account not connected"
+#         }), 400
+
+#     payout_request = PayoutRequest(
+#         worker_id=worker.id,
+#         amount=amount,
+#         stripe_account_id=worker.stripe_account_id,
+#         status="pending"
+#     )
+
+#     # Hold funds immediately
+#     worker.available_balance -= amount
+
+#     worker.pending_balance = (
+#         worker.pending_balance or 0.0
+#     ) + amount
+
+#     db.session.add(payout_request)
+
+#     db.session.commit()
+
+#     return jsonify({
+#         "message": "Payout request submitted",
+#         "request_id": payout_request.id,
+#         "amount": amount
+#     }), 201
+
+
+# # =========================
+# # ADMIN GET ALL PAYOUT REQUESTS
+# # =========================
+# @job_bp.route("/admin/payout-requests", methods=["GET"])
+# @jwt_required()
+# def get_all_payout_requests():
+
+#     user = User.query.get(get_jwt_identity())
+
+#     if not user:
+#         return jsonify({
+#             "error": "User not found"
+#         }), 404
+
+#     # Change this logic later if you build proper admin roles
+#     if user.role != "admin":
+#         return jsonify({
+#             "error": "Unauthorized"
+#         }), 403
+
+#     payout_requests = PayoutRequest.query.order_by(
+#         PayoutRequest.created_at.desc()
+#     ).all()
+
+#     results = []
+
+#     for payout in payout_requests:
+
+#         worker = Worker.query.get(
+#             payout.worker_id
+#         )
+
+#         worker_name = "Unknown Worker"
+
+#         if worker and worker.user:
+#             worker_name = worker.user.full_name
+
+#         results.append({
+#             "id": payout.id,
+#             "worker_id": payout.worker_id,
+#             "worker_name": worker_name,
+#             "amount": payout.amount,
+#             "status": payout.status,
+#             "payout_method": payout.payout_method,
+#             "stripe_account_id": payout.stripe_account_id,
+#             "stripe_transfer_id": payout.stripe_transfer_id,
+#             "admin_notes": payout.admin_notes,
+#             "created_at": (
+#                 payout.created_at.isoformat()
+#                 if payout.created_at
+#                 else None
+#             ),
+#             "processed_at": (
+#                 payout.processed_at.isoformat()
+#                 if payout.processed_at
+#                 else None
+#             )
+#         })
+
+#     return jsonify(results), 200
+# =========================
+# REQUEST PAYOUT
 # =========================
 @job_bp.route("/worker/request-payout", methods=["POST"])
 @jwt_required()
 def request_payout():
+    # Modernized SQLAlchemy query execution pattern
+    user = db.session.get(User, get_jwt_identity())
 
-    user = User.query.get(get_jwt_identity())
+    if not user or user.role != "worker":
+        return jsonify({"error": "Unauthorized"}), 403
 
-    if not user:
-        return jsonify({
-            "error": "User not found"
-        }), 404
-
-    if user.role != "worker":
-        return jsonify({
-            "error": "Only workers can request payouts"
-        }), 403
-
-    worker = Worker.query.filter_by(
-        user_id=user.id
-    ).first()
+    worker = Worker.query.filter_by(user_id=user.id).first()
 
     if not worker:
+        return jsonify({"error": "Worker profile not found"}), 404
+
+    # Worker must connect Stripe first
+    if not worker.stripe_account_id:
         return jsonify({
-            "error": "Worker profile not found"
-        }), 404
+            "error": "You must connect a Stripe account before requesting payouts"
+        }), 400
+
+    stripe.api_key = current_app.config["STRIPE_SECRET_KEY"]
+
+    try:
+        account = stripe.Account.retrieve(worker.stripe_account_id)
+        if not account.payouts_enabled:
+            return jsonify({
+                "error": "Stripe onboarding is incomplete or payouts are restricted for this account"
+            }), 400
+    except stripe.error.StripeError as e:
+        return jsonify({"error": f"Stripe communication failed: {str(e)}"}), 500
 
     data = request.get_json() or {}
-
     amount = data.get("amount")
 
-    if not amount:
-        return jsonify({
-            "error": "Amount is required"
-        }), 400
+    if amount is None:
+        return jsonify({"error": "Amount required"}), 400
 
     try:
         amount = float(amount)
-    except:
-        return jsonify({
-            "error": "Invalid payout amount"
-        }), 400
+    except (ValueError, TypeError):
+        return jsonify({"error": "Invalid amount payload structure"}), 400
 
     if amount <= 0:
-        return jsonify({
-            "error": "Amount must be greater than 0"
-        }), 400
+        return jsonify({"error": "Amount must be greater than zero"}), 400
 
-    available_balance = worker.available_balance or 0.0
+    # Sanitizing NoneType values from the DB columns into valid floats
+    current_available = worker.available_balance if worker.available_balance is not None else 0.0
+    current_pending = worker.pending_balance if worker.pending_balance is not None else 0.0
 
-    if amount > available_balance:
-        return jsonify({
-            "error": "Insufficient balance"
-        }), 400
+    if amount > current_available:
+        return jsonify({"error": "Insufficient available balance"}), 400
 
-    if not worker.stripe_account_id:
-        return jsonify({
-            "error": "Stripe payout account not connected"
-        }), 400
+    # Execute math mutations safely using local sanitized values
+    worker.available_balance = current_available - amount
+    worker.pending_balance = current_pending + amount
 
     payout_request = PayoutRequest(
         worker_id=worker.id,
         amount=amount,
-        stripe_account_id=worker.stripe_account_id,
-        status="pending"
+        status="pending",
+        payout_method="stripe"
     )
 
-    # Hold funds immediately
-    worker.available_balance -= amount
-
-    worker.pending_balance = (
-        worker.pending_balance or 0.0
-    ) + amount
-
-    db.session.add(payout_request)
-
-    db.session.commit()
+    try:
+        db.session.add(payout_request)
+        db.session.commit()
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"error": "Database error persisting payout state transaction"}), 500
 
     return jsonify({
-        "message": "Payout request submitted",
-        "request_id": payout_request.id,
-        "amount": amount
+        "message": "Payout request submitted successfully",
+        "available_balance": worker.available_balance,
+        "pending_balance": worker.pending_balance
     }), 201
-
-
-# =========================
-# ADMIN GET ALL PAYOUT REQUESTS
-# =========================
-@job_bp.route("/admin/payout-requests", methods=["GET"])
-@jwt_required()
-def get_all_payout_requests():
-
-    user = User.query.get(get_jwt_identity())
-
-    if not user:
-        return jsonify({
-            "error": "User not found"
-        }), 404
-
-    # Change this logic later if you build proper admin roles
-    if user.role != "admin":
-        return jsonify({
-            "error": "Unauthorized"
-        }), 403
-
-    payout_requests = PayoutRequest.query.order_by(
-        PayoutRequest.created_at.desc()
-    ).all()
-
-    results = []
-
-    for payout in payout_requests:
-
-        worker = Worker.query.get(
-            payout.worker_id
-        )
-
-        worker_name = "Unknown Worker"
-
-        if worker and worker.user:
-            worker_name = worker.user.full_name
-
-        results.append({
-            "id": payout.id,
-            "worker_id": payout.worker_id,
-            "worker_name": worker_name,
-            "amount": payout.amount,
-            "status": payout.status,
-            "payout_method": payout.payout_method,
-            "stripe_account_id": payout.stripe_account_id,
-            "stripe_transfer_id": payout.stripe_transfer_id,
-            "admin_notes": payout.admin_notes,
-            "created_at": (
-                payout.created_at.isoformat()
-                if payout.created_at
-                else None
-            ),
-            "processed_at": (
-                payout.processed_at.isoformat()
-                if payout.processed_at
-                else None
-            )
-        })
-
-    return jsonify(results), 200
-
 # =========================
 # ADMIN APPROVE PAYOUT
 # =========================
@@ -2046,3 +2206,34 @@ def approve_payout_request(request_id):
         "amount": payout_request.amount,
         "status": payout_request.status
     }), 200
+
+
+@job_bp.route("/worker/verify-stripe", methods=["POST"])
+@jwt_required()
+def verify_stripe():
+    current_user_id = get_jwt_identity()
+    
+    # 1. Fetch worker info from your database
+    # (Adapt this query line to match your SQLAlchemy/database setup)
+    worker = Worker.query.filter_by(user_id=current_user_id).first()
+    
+    if not worker or not worker.stripe_account_id:
+        return jsonify({"error": "No associated Stripe account found initialization."}), 400
+
+    try:
+        # 2. Query Stripe directly using the stored account ID
+        stripe_account = stripe.Account.retrieve(worker.stripe_account_id)
+        
+        # 3. Check if they completed onboarding and can receive payouts
+        if stripe_account.details_submitted and stripe_account.payouts_enabled:
+            # Update their status in your database
+            worker.stripe_email = stripe_account.email
+            # worker.has_stripe_setup = True (or update whatever boolean/status flags you use)
+            
+            db.session.commit()
+            return jsonify({"status": "success", "message": "Stripe account verification finalized."}), 200
+        else:
+            return jsonify({"error": "Stripe onboarding was not completed entirely."}), 400
+
+    except stripe.error.StripeError as e:
+        return jsonify({"error": str(e)}), 500

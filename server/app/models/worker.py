@@ -27,7 +27,8 @@ class Worker(db.Model):
     longitude = db.Column(db.Float)
     total_gross_earnings = db.Column(db.Float, default=0.0) # Before your 15% split
     total_net_earnings = db.Column(db.Float, default=0.0)   # What they actually take home
-    available_balance = db.Column(db.Float, default=0.0)
+    # In your Worker model class:
+    available_balance = db.Column(db.Float, default=0.0, server_default="0.0", nullable=False)
     pending_balance = db.Column(db.Float, default=0.0)
     total_lifetime_earnings = db.Column(db.Float, default=0.0)
 
@@ -96,11 +97,14 @@ class PayoutRequest(db.Model):
         default="pending"
     )
 
-    payout_method = db.Column(db.String(50))
+    payout_method = db.Column(
+        db.String(50),
+        default="stripe"
+    )
+
+    stripe_payout_id = db.Column(db.String)
 
     created_at = db.Column(
         db.DateTime,
         server_default=db.func.now()
     )
-
-    
