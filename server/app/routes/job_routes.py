@@ -1420,7 +1420,8 @@ def mark_job_finished(job_id):
 @job_bp.route("/jobs/<int:job_id>/confirm", methods=["PATCH"])
 @jwt_required()
 def confirm_job_completion(job_id):
-    user = User.query.get(get_jwt_identity())
+
+    user = db.session.get(User, get_jwt_identity())
 
     if not user:
         return jsonify({"error": "User not found"}), 404
@@ -1428,7 +1429,7 @@ def confirm_job_completion(job_id):
     if user.role != "client":
         return jsonify({"error": "Only clients can confirm completion"}), 403
 
-    job = Job.query.get(job_id)
+    job = db.session.get(Job, job_id)
 
     if not job:
         return jsonify({"error": "Job not found"}), 404
@@ -1439,7 +1440,7 @@ def confirm_job_completion(job_id):
     if job.status != "pending_confirmation":
         return jsonify({"error": "Job is not pending confirmation"}), 400
 
-    worker = Worker.query.get(job.worker_id)
+    worker = db.session.get(Worker, job.worker_id)
 
     if not worker:
         return jsonify({"error": "Worker not found"}), 404
@@ -1459,7 +1460,11 @@ def confirm_job_completion(job_id):
     # =====================================
     # FINANCIAL CALCULATIONS
     # =====================================
-    gross_amount = float(job.amount_paid or 0.0)
+
+    # Fallback to budget if amount_paid is empty
+    gross_amount = float(
+        job.amount_paid if job.amount_paid is not None else job.budget or 0.0
+    )
 
     platform_fee = round(gross_amount * 0.15, 2)
 
@@ -1469,45 +1474,93 @@ def confirm_job_completion(job_id):
     )
 
     # =====================================
+    # DEBUG LOGS
+    # =====================================
+    print("JOB AMOUNT PAID:", job.amount_paid)
+    print("JOB BUDGET:", job.budget)
+    print("GROSS AMOUNT:", gross_amount)
+    print("PLATFORM FEE:", platform_fee)
+    print("WORKER PAYOUT:", worker_payout)
+
+    print("AVAILABLE BEFORE UPDATE:", worker.available_balance)
+    print("PENDING BEFORE UPDATE:", worker.pending_balance)
+
+    # =====================================
     # WORKER LIFETIME TRACKING
     # =====================================
-    worker.total_gross_earnings = (
-        worker.total_gross_earnings or 0.0
-    ) + gross_amount
+    worker.total_gross_earnings = round(
+        (worker.total_gross_earnings or 0.0) + gross_amount,
+        2
+    )
 
-    worker.total_net_earnings = (
-        worker.total_net_earnings or 0.0
-    ) + worker_payout
+    worker.total_net_earnings = round(
+        (worker.total_net_earnings or 0.0) + worker_payout,
+        2
+    )
 
     # =====================================
     # INTERNAL WALLET SYSTEM
     # =====================================
 
-    # Funds available for withdrawal
-    worker.available_balance = (
-        worker.available_balance or 0.0
-    ) + worker_payout
+    # Add payout to available balance
+    worker.available_balance = round(
+        (worker.available_balance or 0.0) + worker_payout,
+        2
+    )
 
-    # Optional future metric
-    worker.total_lifetime_earnings = (
-        worker.total_lifetime_earnings or 0.0
-    ) + worker_payout
+    # Reduce pending balance safely
+    current_pending = worker.pending_balance or 0.0
+
+    if current_pending >= worker_payout:
+        worker.pending_balance = round(
+            current_pending - worker_payout,
+            2
+        )
+    else:
+        worker.pending_balance = 0.0
+
+    # =====================================
+    # OPTIONAL LIFETIME METRIC
+    # =====================================
+    worker.total_lifetime_earnings = round(
+        (worker.total_lifetime_earnings or 0.0) + worker_payout,
+        2
+    )
 
     # =====================================
     # PLATFORM REVENUE TRACKING
     # =====================================
-
     current_platform_revenue = getattr(
         current_app,
         "platform_revenue",
         0.0
     )
 
-    current_app.platform_revenue = (
-        current_platform_revenue + platform_fee
+    current_app.platform_revenue = round(
+        current_platform_revenue + platform_fee,
+        2
     )
 
-    db.session.commit()
+    print("AVAILABLE AFTER UPDATE:", worker.available_balance)
+    print("PENDING AFTER UPDATE:", worker.pending_balance)
+
+    # =====================================
+    # SAVE CHANGES
+    # =====================================
+    try:
+        db.session.commit()
+
+        print("AVAILABLE AFTER COMMIT:", worker.available_balance)
+        print("PENDING AFTER COMMIT:", worker.pending_balance)
+
+    except Exception as e:
+        db.session.rollback()
+
+        print("COMMIT ERROR:", str(e))
+
+        return jsonify({
+            "error": "Financial ledger update failed to persist to database."
+        }), 500
 
     return jsonify({
         "message": "Job completed successfully",
@@ -1520,10 +1573,10 @@ def confirm_job_completion(job_id):
 
         "worker_wallet": {
             "available_balance": worker.available_balance,
+            "pending_balance": worker.pending_balance,
             "total_lifetime_earnings": worker.total_lifetime_earnings
         }
     }), 200
-
 # =========================
 # CREATE STRIPE CHECKOUT
 # =========================
@@ -2056,13 +2109,170 @@ def stripe_status():
 #         })
 
 #     return jsonify(results), 200
-# =========================
-# REQUEST PAYOUT
-# =========================
+
+# # =========================
+# # REQUEST PAYOUT
+# # =========================
+# @job_bp.route("/worker/request-payout", methods=["POST"])
+# @jwt_required()
+# def request_payout():
+#     # Modernized SQLAlchemy query execution pattern
+#     user = db.session.get(User, get_jwt_identity())
+
+#     if not user or user.role != "worker":
+#         return jsonify({"error": "Unauthorized"}), 403
+
+#     worker = Worker.query.filter_by(user_id=user.id).first()
+
+#     if not worker:
+#         return jsonify({"error": "Worker profile not found"}), 404
+
+#     # Worker must connect Stripe first
+#     if not worker.stripe_account_id:
+#         return jsonify({
+#             "error": "You must connect a Stripe account before requesting payouts"
+#         }), 400
+
+#     stripe.api_key = current_app.config["STRIPE_SECRET_KEY"]
+
+#     try:
+#         account = stripe.Account.retrieve(worker.stripe_account_id)
+#         if not account.payouts_enabled:
+#             return jsonify({
+#                 "error": "Stripe onboarding is incomplete or payouts are restricted for this account"
+#             }), 400
+#     except stripe.error.StripeError as e:
+#         return jsonify({"error": f"Stripe communication failed: {str(e)}"}), 500
+
+#     data = request.get_json() or {}
+#     amount = data.get("amount")
+
+#     if amount is None:
+#         return jsonify({"error": "Amount required"}), 400
+
+#     try:
+#         amount = float(amount)
+#     except (ValueError, TypeError):
+#         return jsonify({"error": "Invalid amount payload structure"}), 400
+
+#     if amount <= 0:
+#         return jsonify({"error": "Amount must be greater than zero"}), 400
+
+#     # Sanitizing NoneType values from the DB columns into valid floats
+#     current_available = worker.available_balance if worker.available_balance is not None else 0.0
+#     current_pending = worker.pending_balance if worker.pending_balance is not None else 0.0
+
+#     if amount > current_available:
+#         return jsonify({"error": "Insufficient available balance"}), 400
+
+#     # Execute math mutations safely using local sanitized values
+#     worker.available_balance = current_available - amount
+#     worker.pending_balance = current_pending + amount
+
+#     payout_request = PayoutRequest(
+#         worker_id=worker.id,
+#         amount=amount,
+#         status="pending",
+#         payout_method="stripe"
+#     )
+
+#     try:
+#         db.session.add(payout_request)
+#         db.session.commit()
+#     except Exception as e:
+#         db.session.rollback()
+#         return jsonify({"error": "Database error persisting payout state transaction"}), 500
+
+#     return jsonify({
+#         "message": "Payout request submitted successfully",
+#         "available_balance": worker.available_balance,
+#         "pending_balance": worker.pending_balance
+#     }), 201
+
+
+# # =========================
+# # REQUEST PAYOUT (ADMIN QUEUE SYSTEM)
+# # =========================
+# @job_bp.route("/worker/request-payout", methods=["POST"])
+# @jwt_required()
+# def request_payout():
+
+#     user = db.session.get(User, get_jwt_identity())
+
+#     if not user or user.role != "worker":
+#         return jsonify({"error": "Unauthorized"}), 403
+
+#     worker = Worker.query.filter_by(user_id=user.id).first()
+
+#     if not worker:
+#         return jsonify({"error": "Worker profile not found"}), 404
+
+#     # Stripe still required (you want this)
+#     if not worker.stripe_account_id:
+#         return jsonify({
+#             "error": "You must connect a Stripe account before requesting payouts"
+#         }), 400
+
+#     stripe.api_key = current_app.config["STRIPE_SECRET_KEY"]
+
+#     try:
+#         account = stripe.Account.retrieve(worker.stripe_account_id)
+
+#         if not account.payouts_enabled:
+#             return jsonify({
+#                 "error": "Stripe onboarding incomplete or payouts disabled"
+#             }), 400
+
+#     except stripe.error.StripeError as e:
+#         return jsonify({"error": f"Stripe communication failed: {str(e)}"}), 500
+
+#     data = request.get_json() or {}
+
+#     amount = data.get("amount")
+#     job_id = data.get("job_id")
+
+#     if amount is None:
+#         return jsonify({"error": "Amount required"}), 400
+
+#     try:
+#         amount = float(amount)
+#     except (ValueError, TypeError):
+#         return jsonify({"error": "Invalid amount"}), 400
+
+#     if amount <= 0:
+#         return jsonify({"error": "Amount must be greater than zero"}), 400
+
+#     # ❌ REMOVED:
+#     # - available_balance check
+#     # - pending_balance mutation
+#     # - wallet logic completely removed
+
+#     payout_request = PayoutRequest(
+#         worker_id=worker.id,
+#         job_id=job_id,
+#         amount=amount,
+#         status="pending_admin",   # NEW FLOW
+#         payout_method="stripe"
+#     )
+
+#     try:
+#         db.session.add(payout_request)
+#         db.session.commit()
+
+#     except Exception as e:
+#         db.session.rollback()
+#         return jsonify({"error": "Failed to create payout request"}), 500
+
+#     return jsonify({
+#         "message": "Payout request sent to admin",
+#         "status": "pending_admin"
+#     }), 201
+
+
 @job_bp.route("/worker/request-payout", methods=["POST"])
 @jwt_required()
 def request_payout():
-    # Modernized SQLAlchemy query execution pattern
+
     user = db.session.get(User, get_jwt_identity())
 
     if not user or user.role != "worker":
@@ -2070,70 +2280,92 @@ def request_payout():
 
     worker = Worker.query.filter_by(user_id=user.id).first()
 
-    if not worker:
-        return jsonify({"error": "Worker profile not found"}), 404
-
-    # Worker must connect Stripe first
-    if not worker.stripe_account_id:
-        return jsonify({
-            "error": "You must connect a Stripe account before requesting payouts"
-        }), 400
-
-    stripe.api_key = current_app.config["STRIPE_SECRET_KEY"]
-
-    try:
-        account = stripe.Account.retrieve(worker.stripe_account_id)
-        if not account.payouts_enabled:
-            return jsonify({
-                "error": "Stripe onboarding is incomplete or payouts are restricted for this account"
-            }), 400
-    except stripe.error.StripeError as e:
-        return jsonify({"error": f"Stripe communication failed: {str(e)}"}), 500
-
     data = request.get_json() or {}
-    amount = data.get("amount")
 
-    if amount is None:
-        return jsonify({"error": "Amount required"}), 400
-
-    try:
-        amount = float(amount)
-    except (ValueError, TypeError):
-        return jsonify({"error": "Invalid amount payload structure"}), 400
+    amount = float(data.get("amount", 0))
+    job_id = data.get("job_id")
 
     if amount <= 0:
-        return jsonify({"error": "Amount must be greater than zero"}), 400
-
-    # Sanitizing NoneType values from the DB columns into valid floats
-    current_available = worker.available_balance if worker.available_balance is not None else 0.0
-    current_pending = worker.pending_balance if worker.pending_balance is not None else 0.0
-
-    if amount > current_available:
-        return jsonify({"error": "Insufficient available balance"}), 400
-
-    # Execute math mutations safely using local sanitized values
-    worker.available_balance = current_available - amount
-    worker.pending_balance = current_pending + amount
+        return jsonify({"error": "Invalid amount"}), 400
 
     payout_request = PayoutRequest(
         worker_id=worker.id,
+        job_id=job_id,
         amount=amount,
-        status="pending",
-        payout_method="stripe"
+        status="pending_admin"
     )
 
+    db.session.add(payout_request)
+    db.session.commit()
+
+    return jsonify({
+        "message": "Payout request sent to admin",
+        "status": "pending_admin"
+    }), 201
+
+# =========================================================
+# ADMIN CONTROLLERS: APPROVE OR REJECT REQUESTS (BATCH & SINGLE)
+# =========================================================
+@job_bp.route("/admin/process-payouts", methods=["PATCH"])
+@jwt_required()
+def admin_process_payouts():
+    user = db.session.get(User, get_jwt_identity())
+    
+    # Simple Admin role protection check
+    if not user or user.role != "admin":
+        return jsonify({"error": "Access denied. Administrative privileges required."}), 403
+
+    data = request.get_json() or {}
+    payout_ids = data.get("payout_ids", [])  # Expects a list of numbers: [1, 2, 3]
+    action = data.get("action")  # Expects either: "approve", "reject", or "fail"
+
+    if not payout_ids or action not in ["approve", "reject", "fail"]:
+        return jsonify({"error": "Invalid payload format or action parameter missing."}), 400
+
+    processed_logs = []
+
+    # Iterate through the list of requests to support full batch actions
+    for payout_id in payout_ids:
+        payout = db.session.get(PayoutRequest, payout_id)
+        if not payout or payout.status != "pending":
+            continue  # Skip rows that don't exist or are already completed
+
+        worker = db.session.get(Worker, payout.worker_id)
+        if not worker:
+            continue
+
+        current_pending = round(worker.pending_balance or 0.0, 2)
+        current_available = round(worker.available_balance or 0.0, 2)
+
+        if action == "approve":
+            # Admin says they will manually send the wire: clear it from their pending escrow profile
+            payout.status = "approved"
+            if current_pending >= payout.amount:
+                worker.pending_balance = round(current_pending - payout.amount, 2)
+            else:
+                worker.pending_balance = 0.0
+
+        elif action in ["reject", "fail"]:
+            # Rollback event: return money securely back to available balance pool
+            payout.status = action
+            if current_pending >= payout.amount:
+                worker.pending_balance = round(current_pending - payout.amount, 2)
+            
+            worker.available_balance = round(current_available + payout.amount, 2)
+
+        processed_logs.append({"payout_id": payout_id, "status": payout.status})
+
     try:
-        db.session.add(payout_request)
         db.session.commit()
     except Exception as e:
         db.session.rollback()
-        return jsonify({"error": "Database error persisting payout state transaction"}), 500
+        return jsonify({"error": "Database error processing bulk execution logs."}), 500
 
     return jsonify({
-        "message": "Payout request submitted successfully",
-        "available_balance": worker.available_balance,
-        "pending_balance": worker.pending_balance
-    }), 201
+        "message": f"Successfully batch processed {len(processed_logs)} requests.",
+        "results": processed_logs
+    }), 200
+
 # =========================
 # ADMIN APPROVE PAYOUT
 # =========================
