@@ -19,7 +19,7 @@ export default function WorkerCard({ worker, onViewProfile }) {
           </span>
           <span className="text-slate-300">•</span>
           <span className="text-slate-500 font-semibold tracking-tight">
-            {worker.completed_jobs || 0} jobs split
+            {worker.completed_jobs || 0} tasks finished
           </span>
         </div>
 

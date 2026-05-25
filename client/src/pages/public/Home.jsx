@@ -2,6 +2,7 @@ import React, { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import Navbar from '../../components/Navbar';
+import { ArrowRight, UserCheck, Briefcase, PlusCircle } from 'lucide-react';
 
 export default function Home() {
   const { token, user } = useAuth();
@@ -28,10 +29,11 @@ export default function Home() {
   return (
     <div className="bg-[#fcfcfc] min-h-screen font-sans antialiased text-slate-600 selection:bg-slate-200 selection:text-slate-900 overflow-x-hidden">
       
-      {/* 🌐 Clean Navigation Header Wrap */}
-      <div className="border-b border-slate-100 bg-white/80 backdrop-blur-md sticky top-0 z-50">
-        <Navbar setShowGetStarted={handleTriggerGetStarted} />
-      </div>
+      {/* 🌐 Clean Navigation Header Wrap - Made Sticky & Elevated with Subtle Shadow */}
+      {/* <div className="bg-white/80 backdrop-blur-md sticky top-0 z-50 transition-all border-b border-slate-200/50 shadow-xs"> */}
+        <Navbar />
+        {/* setShowGetStarted={handleTriggerGetStarted} /> */}
+      
 
       {/* 🚀 Hero Section (Bright & Airy Aesthetic) */}
       <header className="max-w-5xl mx-auto text-center px-4 sm:px-6 pt-28 pb-32 relative overflow-visible">
@@ -40,7 +42,7 @@ export default function Home() {
         <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[500px] h-[500px] bg-slate-200/30 rounded-full blur-[120px] -z-10 pointer-events-none" />
         
         {/* Minimalist Pill Badge */}
-        <span className="inline-flex items-center gap-2 py-1.5 px-4 rounded-full text-xs font-semibold bg-slate-100 text-slate-800 mb-8 border border-slate-200/60 shadow-sm">
+        <span className="inline-flex items-center gap-2 py-1.5 px-4 rounded-full text-xs font-semibold bg-slate-100 text-slate-800 mb-8 border border-slate-200/60 shadow-xs">
           <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
           {token ? `Active Session: Welcome Back, ${user?.name || 'Partner'}` : 'An Easier Way to Get Things Done'}
         </span>
@@ -64,28 +66,28 @@ export default function Home() {
                 <>
                   <button
                     onClick={() => navigate('/client/post-job')}
-                    className="bg-slate-900 text-white font-bold text-sm px-8 py-4 rounded-xl hover:bg-slate-800 transition-all duration-200 shadow-md active:scale-98"
+                    className="bg-slate-900 text-white font-bold text-sm px-8 py-4 rounded-xl hover:bg-slate-800 transition-all duration-200 shadow-md active:scale-98 flex items-center gap-2"
                   >
-                    Post a New Task
+                    <PlusCircle className="w-4 h-4" /> Post a New Task
                   </button>
                   <button
-                    onClick={() => navigate('/client/dashboard')}
-                    className="bg-white text-slate-700 border border-slate-200 font-bold text-sm px-8 py-4 rounded-xl hover:bg-slate-50 transition-all duration-200 shadow-sm active:scale-98"
+                    onClick={() => navigate('/workers')}
+                    className="bg-white text-slate-700 border border-slate-200 font-bold text-sm px-8 py-4 rounded-xl hover:bg-slate-50 transition-all duration-200 shadow-xs active:scale-98 flex items-center gap-2"
                   >
-                    Manage Assignments
+                    <UserCheck className="w-4 h-4" /> Browse Helpers
                   </button>
                 </>
               ) : (
                 <>
                   <button
                     onClick={() => navigate('/browse-jobs')}
-                    className="bg-slate-900 text-white font-bold text-sm px-8 py-4 rounded-xl hover:bg-slate-800 transition-all duration-200 shadow-md active:scale-98"
+                    className="bg-slate-900 text-white font-bold text-sm px-8 py-4 rounded-xl hover:bg-slate-800 transition-all duration-200 shadow-md active:scale-98 flex items-center gap-2"
                   >
-                    Browse Active Marketplace
+                    <Briefcase className="w-4 h-4" /> Browse Active Gigs
                   </button>
                   <button
                     onClick={() => navigate('/worker/dashboard')}
-                    className="bg-white text-slate-700 border border-slate-200 font-bold text-sm px-8 py-4 rounded-xl hover:bg-slate-50 transition-all duration-200 shadow-sm active:scale-98"
+                    className="bg-white text-slate-700 border border-slate-200 font-bold text-sm px-8 py-4 rounded-xl hover:bg-slate-50 transition-all duration-200 shadow-xs active:scale-98"
                   >
                     View My Pitches
                   </button>
@@ -103,15 +105,15 @@ export default function Home() {
                   Get Started Today
                 </button>
                 <button
-                  onClick={() => navigate('/browse-jobs')}
-                  className="bg-white text-slate-700 border border-slate-200 font-bold text-sm px-8 py-4 rounded-xl hover:bg-slate-50 transition-all duration-200 shadow-sm"
+                  onClick={() => navigate('/workers')}
+                  className="bg-white text-slate-700 border border-slate-200 font-bold text-sm px-8 py-4 rounded-xl hover:bg-slate-50 hover:text-indigo-600 hover:border-indigo-200 transition-all duration-200 shadow-xs"
                 >
-                  View Live Jobs
+                  View Available Helpers
                 </button>
               </div>
             ) : (
               /* Crisp Selector Panel */
-              <div className="bg-white border border-slate-200 rounded-2xl p-6 sm:p-8 max-w-xl mx-auto shadow-xl shadow-slate-100 transition-all duration-300 relative">
+              <div className="bg-white border border-slate-200 rounded-3xl p-6 sm:p-8 max-w-xl mx-auto shadow-xl shadow-slate-100 transition-all duration-300 relative">
                 <div className="flex justify-between items-center mb-6">
                   <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Select your pathway option</p>
                   <button 
@@ -126,9 +128,9 @@ export default function Home() {
                   {/* Client Portal Option */}
                   <button
                     onClick={() => handleGetStarted('client')}
-                    className="flex flex-col items-center justify-center p-6 bg-slate-50/50 border border-slate-200/80 rounded-xl hover:border-slate-400 hover:bg-white group transition-all duration-200 text-center cursor-pointer active:scale-99"
+                    className="flex flex-col items-center justify-center p-6 bg-slate-50/50 border border-slate-200/80 rounded-2xl hover:border-slate-400 hover:bg-white group transition-all duration-200 text-center cursor-pointer active:scale-99"
                   >
-                    <div className="w-11 h-11 rounded-lg bg-white border border-slate-200 text-slate-500 flex items-center justify-center mb-4 group-hover:bg-slate-900 group-hover:text-white group-hover:border-slate-900 transition-all duration-200 shadow-sm">
+                    <div className="w-11 h-11 rounded-xl bg-white border border-slate-200 text-slate-500 flex items-center justify-center mb-4 group-hover:bg-slate-900 group-hover:text-white group-hover:border-slate-900 transition-all duration-200 shadow-xs">
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
                       </svg>
@@ -140,9 +142,9 @@ export default function Home() {
                   {/* Worker Portal Option */}
                   <button
                     onClick={() => handleGetStarted('worker')}
-                    className="flex flex-col items-center justify-center p-6 bg-slate-50/50 border border-slate-200/80 rounded-xl hover:border-slate-400 hover:bg-white group transition-all duration-200 text-center cursor-pointer active:scale-99"
+                    className="flex flex-col items-center justify-center p-6 bg-slate-50/50 border border-slate-200/80 rounded-2xl hover:border-slate-400 hover:bg-white group transition-all duration-200 text-center cursor-pointer active:scale-99"
                   >
-                    <div className="w-11 h-11 rounded-lg bg-white border border-slate-200 text-slate-500 flex items-center justify-center mb-4 group-hover:bg-slate-900 group-hover:text-white group-hover:border-slate-900 transition-all duration-200 shadow-sm">
+                    <div className="w-11 h-11 rounded-xl bg-white border border-slate-200 text-slate-500 flex items-center justify-center mb-4 group-hover:bg-slate-900 group-hover:text-white group-hover:border-slate-900 transition-all duration-200 shadow-xs">
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.907c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.381-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z"/>
                       </svg>
@@ -165,7 +167,7 @@ export default function Home() {
             <p className="text-slate-500 mt-2 max-w-xl mx-auto text-sm">Built around fast help, transparent pricing, and honest local work.</p>
           </div>
           
-          <div className="grid md:grid-cols-3 gap-6">
+          <div className="grid md:grid-cols-3 gap-6 mb-16">
             {/* Pillar 1 */}
             <div className="p-8 bg-white border border-slate-200/80 rounded-2xl hover:border-slate-300 hover:shadow-md transition-all duration-300 group">
               <div className="w-11 h-11 rounded-lg bg-slate-50 border border-slate-200 text-slate-700 flex items-center justify-center mb-6 group-hover:bg-slate-900 group-hover:text-white transition-all duration-300">
@@ -199,6 +201,29 @@ export default function Home() {
               </p>
             </div>
           </div>
+
+          {/* ⚡ Strategic Mid-Section Split CTA Banner */}
+          <div className="bg-gradient-to-r from-slate-900 via-slate-800 to-slate-950 rounded-3xl p-8 md:p-10 text-white flex flex-col md:flex-row items-center justify-between gap-6 shadow-xl">
+            <div className="text-center md:text-left space-y-1">
+              <h3 className="text-xl font-extrabold tracking-tight">Ready to leverage our network?</h3>
+              <p className="text-slate-400 text-xs md:text-sm">Find verified task specialist neighbors or open your wallet to community listings.</p>
+            </div>
+            <div className="flex flex-wrap gap-3 justify-center">
+              <button 
+                onClick={() => navigate(token && isClient ? '/client/post-job' : '/workers')}
+                className="bg-white text-slate-900 font-bold text-xs px-5 py-3 rounded-xl hover:bg-slate-100 transition shadow-sm cursor-pointer"
+              >
+                {token && isClient ? 'Post a Task' : 'Find Help Near You'}
+              </button>
+              <button 
+                onClick={() => token ? navigate(isWorker ? '/browse-jobs' : '/client/dashboard') : handleTriggerGetStarted()}
+                className="bg-slate-800/80 text-slate-200 border border-slate-700 font-bold text-xs px-5 py-3 rounded-xl hover:bg-slate-700/60 hover:text-white transition cursor-pointer"
+              >
+                Start Earning Today
+              </button>
+            </div>
+          </div>
+
         </div>
       </section>
 
@@ -212,13 +237,13 @@ export default function Home() {
           <div className="inline-flex p-1 bg-slate-100 border border-slate-200 rounded-xl mt-8">
             <button 
               onClick={() => setActiveTab('client')}
-              className={`px-6 py-2 text-xs font-bold rounded-lg transition-all duration-200 cursor-pointer ${activeTab === 'client' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}
+              className={`px-6 py-2 text-xs font-bold rounded-lg transition-all duration-200 cursor-pointer ${activeTab === 'client' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-500 hover:text-slate-800'}`}
             >
               For Clients
             </button>
             <button 
               onClick={() => setActiveTab('worker')}
-              className={`px-6 py-2 text-xs font-bold rounded-lg transition-all duration-200 cursor-pointer ${activeTab === 'worker' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}
+              className={`px-6 py-2 text-xs font-bold rounded-lg transition-all duration-200 cursor-pointer ${activeTab === 'worker' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-500 hover:text-slate-800'}`}
             >
               For Workers
             </button>
@@ -256,7 +281,7 @@ export default function Home() {
       <section className="bg-slate-50 border-y border-slate-200/60 py-24 relative">
         <div className="max-w-5xl mx-auto px-4 sm:px-6">
           <div className="text-center mb-16">
-            <span className="text-[10px] uppercase font-bold tracking-widest text-slate-500 bg-white border border-slate-200 px-3.5 py-1.5 rounded-full shadow-sm">
+            <span className="text-[10px] uppercase font-bold tracking-widest text-slate-500 bg-white border border-slate-200 px-3.5 py-1.5 rounded-full shadow-xs">
               Money Management Made Simple
             </span>
             <h2 className="text-2xl font-black text-slate-900 tracking-tight sm:text-3xl mt-5">
@@ -385,7 +410,7 @@ export default function Home() {
             { q: "How does pricing work?", a: "Workers do not try to bid or change your price. They simply apply to the flat price you offer, showing you their experience and schedule so you can pick the best fit." },
             { q: "What do workers need to do to get approved?", a: "To keep everyone on the platform safe, new helpers must upload standard identification. This confirms who you are before you can start browsing and picking up shifts." }
           ].map((faq, index) => (
-            <details key={index} className="group bg-white p-5 rounded-xl border border-slate-200 hover:border-slate-300 [&_summary::-webkit-details-marker]:hidden transition-all duration-200 shadow-sm">
+            <details key={index} className="group bg-white p-5 rounded-xl border border-slate-200 hover:border-slate-300 [&_summary::-webkit-details-marker]:hidden transition-all duration-200 shadow-xs">
               <summary className="flex justify-between items-center font-bold text-slate-900 text-sm sm:text-base cursor-pointer select-none">
                 <span>{faq.q}</span>
                 <svg className="w-4 h-4 text-slate-400 group-open:rotate-180 transition-transform duration-200" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7"/></svg>
@@ -397,6 +422,32 @@ export default function Home() {
           ))}
         </div>
       </section>
+
+      {/* 🏁 Final Pre-Footer Catch-All CTA Section */}
+      {!token && (
+        <section className="bg-slate-50 border-t border-slate-200/60 py-20 text-center px-4">
+          <div className="max-w-2xl mx-auto space-y-6">
+            <h2 className="text-2xl font-black text-slate-900 tracking-tight sm:text-3xl">Get started with Homehelp today</h2>
+            <p className="text-slate-500 text-xs sm:text-sm leading-relaxed max-w-md mx-auto">
+              Join thousands of neighbors securely handing off gigs or claiming flexible local shifts on their own terms.
+            </p>
+            <div className="flex justify-center gap-3 flex-wrap">
+              <button
+                onClick={handleTriggerGetStarted}
+                className="bg-slate-900 text-white font-bold text-xs px-6 py-3.5 rounded-xl hover:bg-slate-800 transition flex items-center gap-1.5 shadow-md"
+              >
+                Create Account <ArrowRight className="w-3.5 h-3.5" />
+              </button>
+              <button
+                onClick={() => navigate('/workers')}
+                className="bg-white text-slate-700 border border-slate-200 font-bold text-xs px-6 py-3.5 rounded-xl hover:bg-slate-50 transition"
+              >
+                Browse Helpers
+              </button>
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* Light Minimalist Footer */}
       <footer className="text-center py-12 text-[11px] text-slate-400 border-t border-slate-200/60 bg-white">
