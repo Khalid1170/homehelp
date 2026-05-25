@@ -13,19 +13,18 @@ import {
   CreditCard,
   TrendingUp,
   ArrowLeft,
-  LayoutDashboard
+  XCircle
 } from 'lucide-react';
 
 export default function AdminPayoutDashboard() {
   const { token, logout } = useAuth();
   const navigate = useNavigate();
   
-  // Platform Transaction Data Feeds
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState('all'); // all | pending | completed
+  const [statusFilter, setStatusFilter] = useState('all'); // all | pending | completed | rejected
   const [processingId, setProcessingId] = useState(null);
 
   const fetchPayoutRequests = async () => {
@@ -73,7 +72,6 @@ export default function AdminPayoutDashboard() {
 
       alert('Payout state committed. Balances updated successfully.');
       
-      // Hot reload matrix rows cleanly
       setRequests(prev => prev.map(req => 
         req.id === requestId 
           ? { ...req, status: 'completed', processed_at: new Date().toISOString() } 
@@ -81,6 +79,38 @@ export default function AdminPayoutDashboard() {
       ));
     } catch (err) {
       alert(`Approval Exception: ${err.message}`);
+    } finally {
+      setProcessingId(null);
+    }
+  };
+
+  // 🚀 NEW: HANDLE REJECT FLOW
+  const handleRejectPayout = async (requestId) => {
+    if (!window.confirm(`Are you sure you want to REJECT payout request #${requestId}?`)) return;
+    
+    setProcessingId(requestId);
+    try {
+      const res = await fetch(`http://localhost:5000/admin/payout-requests/${requestId}/reject`, {
+        method: 'PATCH',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Execution engine encountered a rejection failure.');
+
+      alert('Payout request rejected. Ledger status modified.');
+      
+      // Update UI row status to 'rejected' cleanly
+      setRequests(prev => prev.map(req => 
+        req.id === requestId 
+          ? { ...req, status: 'rejected' } 
+          : req
+      ));
+    } catch (err) {
+      alert(`Rejection Exception: ${err.message}`);
     } finally {
       setProcessingId(null);
     }
@@ -97,15 +127,15 @@ export default function AdminPayoutDashboard() {
 
   // Filtering Matrix Logic
   const filteredRequests = requests.filter(req => {
+    const workerName = req.worker_name || '';
     const matchesSearch = 
-      req.worker_name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-      String(req.worker_id).includes(searchTerm) ||
-      String(req.id).includes(searchTerm);
+      workerName.toLowerCase().includes(searchTerm.toLowerCase()) || 
+      String(req.worker_id || '').includes(searchTerm) ||
+      String(req.id || '').includes(searchTerm);
     const matchesStatus = statusFilter === 'all' || req.status === statusFilter;
     return matchesSearch && matchesStatus;
   });
 
-  // 🔄 LOADING BOUNDARY LAYOUT
   if (loading) {
     return (
       <div className="min-h-screen bg-slate-950 text-slate-400 flex items-center justify-center font-sans">
@@ -117,7 +147,6 @@ export default function AdminPayoutDashboard() {
     );
   }
 
-  // 🛡️ SECURITY / ERROR BOUNDARY LAYOUT
   if (error) {
     return (
       <div className="min-h-screen bg-slate-950 text-slate-100 font-sans antialiased">
@@ -136,13 +165,11 @@ export default function AdminPayoutDashboard() {
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 font-sans antialiased">
-      
-      {/* 🔓 Global System Header Block */}
       <AdminTopbar logout={logout} navigate={navigate} fetchAdminData={fetchPayoutRequests} />
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-8">
         
-        {/* 🧭 NEW NAVIGATION HEADER BRIDGE */}
+        {/* NAVIGATION HEADER BRIDGE */}
         <section className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-4 border-b border-slate-800">
           <div>
             <span className="text-[10px] font-black tracking-widest bg-slate-900 border border-slate-800 text-slate-400 px-2.5 py-1 rounded-md uppercase">
@@ -153,7 +180,7 @@ export default function AdminPayoutDashboard() {
           </div>
 
           <button 
-            onClick={() => navigate('/admin/dashboard')} // 👈 Adjust string path matching your route config
+            onClick={() => navigate('/admin/dashboard')}
             className="group flex items-center gap-2 bg-slate-900 hover:bg-slate-850 text-slate-300 hover:text-white text-xs font-bold px-4 py-2.5 rounded-xl border border-slate-800 hover:border-slate-700 transition shadow-lg cursor-pointer"
           >
             <ArrowLeft className="w-4 h-4 text-slate-500 group-hover:text-blue-400 transition-colors" />
@@ -161,7 +188,7 @@ export default function AdminPayoutDashboard() {
           </button>
         </section>
 
-        {/* 📊 Section 1: Financial Telemetry Ledger Aggregates */}
+        {/* Aggregates Layout */}
         <section className="grid grid-cols-1 sm:grid-cols-3 gap-5">
           <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl flex items-center gap-4">
             <div className="w-12 h-12 rounded-xl bg-amber-500/10 text-amber-400 border border-amber-500/20 flex items-center justify-center shrink-0">
@@ -194,7 +221,7 @@ export default function AdminPayoutDashboard() {
           </div>
         </section>
 
-        {/* 🛠️ Section 2: Control Filter Switchboard */}
+        {/* Filter Switchboard */}
         <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 flex flex-col md:flex-row gap-4 items-center justify-between shadow-xl">
           <div className="relative w-full md:max-w-md">
             <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
@@ -208,7 +235,7 @@ export default function AdminPayoutDashboard() {
           </div>
 
           <div className="flex gap-2 w-full md:w-auto overflow-x-auto">
-            {['all', 'pending', 'completed'].map((status) => (
+            {['all', 'pending', 'completed', 'rejected'].map((status) => (
               <button
                 key={status}
                 onClick={() => setStatusFilter(status)}
@@ -224,7 +251,7 @@ export default function AdminPayoutDashboard() {
           </div>
         </div>
 
-        {/* 📋 Section 3: Master Data Stream Table Panel */}
+        {/* Master Data Stream Table Panel */}
         <section className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-xl">
           <div className="overflow-x-auto">
             <table className="w-full text-left text-sm text-slate-300 border-collapse">
@@ -249,18 +276,15 @@ export default function AdminPayoutDashboard() {
                   filteredRequests.map((req) => (
                     <tr key={req.id} className="hover:bg-slate-850/10 transition">
                       
-                      {/* ID Tracking Block */}
                       <td className="p-4 font-mono text-xs text-slate-500">
                         #PO-{req.id}
                       </td>
                       
-                      {/* Worker Profile Meta Block */}
                       <td className="p-4">
                         <span className="text-white font-bold block text-sm">{req.worker_name}</span>
                         <span className="text-[11px] text-slate-500 block font-mono mt-0.5">Ref ID: #WK-{req.worker_id}</span>
                       </td>
                       
-                      {/* Channel Parameters Descriptor */}
                       <td className="p-4">
                         <span className="inline-flex items-center gap-1 text-[10px] bg-slate-950 border border-slate-800 text-slate-300 px-2 py-0.5 rounded font-black uppercase tracking-wide">
                           <CreditCard className="w-3 h-3 text-blue-400" />
@@ -273,7 +297,6 @@ export default function AdminPayoutDashboard() {
                         )}
                       </td>
 
-                      {/* Timeline Configuration Layout */}
                       <td className="p-4 text-slate-400 text-xs">
                         <div className="flex items-center gap-1.5">
                           <Calendar className="w-3.5 h-3.5 text-slate-500" />
@@ -281,33 +304,46 @@ export default function AdminPayoutDashboard() {
                         </div>
                       </td>
 
-                      {/* Operational Capital Volume Values */}
                       <td className="p-4">
                         <span className="text-sm font-black text-white block">
                           £{Number(req.amount).toFixed(2)}
                         </span>
                       </td>
 
-                      {/* State Dispatch Management Actions */}
+                      {/* State Dispatch Action Block */}
                       <td className="p-4 text-right">
                         {req.status === 'pending' ? (
-                          <button
-                            onClick={() => handleApprovePayout(req.id)}
-                            disabled={processingId === req.id}
-                            className="text-xs bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-800 disabled:text-slate-600 text-white font-bold px-3 py-1.5 rounded-lg transition cursor-pointer inline-flex items-center gap-1.5 shadow-md shadow-emerald-950/20"
-                          >
-                            {processingId === req.id ? (
-                              <>
+                          <div className="flex items-center justify-end gap-2">
+                            {/* Approve Trigger Button */}
+                            <button
+                              onClick={() => handleApprovePayout(req.id)}
+                              disabled={processingId !== null}
+                              className="text-xs bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-850 disabled:text-slate-600 text-white font-bold px-3 py-1.5 rounded-lg transition cursor-pointer inline-flex items-center gap-1.5 shadow-md shadow-emerald-950/20"
+                            >
+                              {processingId === req.id ? (
                                 <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                                Processing...
-                              </>
-                            ) : (
-                              'Authorize Disbursal'
-                            )}
-                          </button>
-                        ) : (
+                              ) : (
+                                'Authorize'
+                              )}
+                            </button>
+
+                            {/* 🚀 NEW: Reject Trigger Button */}
+                            <button
+                              onClick={() => handleRejectPayout(req.id)}
+                              disabled={processingId !== null}
+                              className="text-xs bg-red-950 hover:bg-red-900 border border-red-800 text-red-200 disabled:bg-slate-850 disabled:text-slate-600 disabled:border-transparent font-bold px-3 py-1.5 rounded-lg transition cursor-pointer inline-flex items-center gap-1.5 shadow-md"
+                            >
+                              Reject
+                            </button>
+                          </div>
+                        ) : req.status === 'completed' ? (
                           <span className="inline-block text-[10px] font-black uppercase px-2 py-0.5 bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 rounded-md">
                             ✓ Settled Asset
+                          </span>
+                        ) : (
+                          /* 🚀 NEW: Rejected UI Status Presentation Badge */
+                          <span className="inline-block text-[10px] font-black uppercase px-2 py-0.5 bg-red-500/10 text-red-400 border border-red-500/20 rounded-md">
+                            ✕ Rejected
                           </span>
                         )}
                       </td>

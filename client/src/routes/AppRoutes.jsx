@@ -8,6 +8,7 @@ import Login from '../pages/auth/Login';
 import Register from '../pages/auth/Register';
 import BrowseJobs from '../pages/public/BrowseJobs';
 import JobFullDetails from '../pages/public/JobFullDetails';
+import WorkersDirectory from '../pages/public/WorkersDirectory'; // 👈 ADDED: Public network directory
 
 // 💼 Client Page Imports
 import ClientDashboard from '../pages/client/ClientDashboard';
@@ -16,11 +17,11 @@ import CreateJob from '../pages/client/CreateJob';
 // 🛠️ Worker Page Imports
 import WorkerDashboard from '../pages/worker/WorkerDashboard';
 import JobPitchForm from '../pages/worker/JobPitchForm';
-import StripeCallback from '../pages/worker/StripeCallback'; // 👈 ADDED: Stripe redirect callback component
+import StripeCallback from '../pages/worker/StripeCallback'; // Onboarding Handshake Landings for Express Connect Accounts
 
 // 📊 Admin Page Imports
 import AdminDashboard from '../pages/admin/AdminDashboard';
-import AdminPayoutDashboard from '../pages/admin/AdminPayoutDashboard'; // 👈 FIXED: Unified import relative path syntax
+import AdminPayoutDashboard from '../pages/admin/AdminPayoutDashboard';
 
 
 // 🛡️ Protected Route Gatekeeper
@@ -48,6 +49,9 @@ export default function AppRoutes() {
       <Route path="/login" element={<Login />} />
       <Route path="/register" element={<Register />} />
       <Route path="/browse-jobs" element={<BrowseJobs />} />
+      
+      {/* 🌐 NEW: Publicly Accessible Worker Registry Directory */}
+      <Route path="/workers" element={<WorkersDirectory />} />
       
       {/* 👁️ Publicly Accessible Job Details Profile View */}
       <Route path="/jobs/:id" element={<JobFullDetails />} />
@@ -78,7 +82,7 @@ export default function AppRoutes() {
         </ProtectedRoute>
       } />
 
-      {/* 💳 NEW: Onboarding Handshake Landings for Express Connect Accounts */}
+      {/* 💳 Onboarding Handshake Landings for Express Connect Accounts */}
       <Route path="/stripe-callback" element={
         <ProtectedRoute allowedRoles={['worker']}>
           <StripeCallback />
@@ -92,7 +96,7 @@ export default function AppRoutes() {
         </ProtectedRoute>
       } />
       
-      {/* 💰 NEW: Integrated Escrow Balance & Payout Management Panel */}
+      {/* 💰 Integrated Escrow Balance & Payout Management Panel */}
       <Route path="/admin/payouts" element={
         <ProtectedRoute allowedRoles={['admin']}>
           <AdminPayoutDashboard />
