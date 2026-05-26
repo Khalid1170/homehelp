@@ -20,7 +20,9 @@ export default function WorkersJobCard({
   isExpanded,
   onToggleExpand,
   hasStripeSetup,
-  onPayoutSuccess
+  onPayoutSuccess,
+  token,
+  currentUserId
 }) {
   const [requesting, setRequesting] = useState(false);
   const [markingFinished, setMarkingFinished] = useState(false);
@@ -387,10 +389,16 @@ export default function WorkersJobCard({
               )}
               {/* 🟢 NEW: Render the Chat Modal when state is true */}
       {isChatModalOpen && (
-        <JobChatModal
+//         <JobChatModal
+//   jobId={job.job_id || job.id}
+//   token={localStorage.getItem('token')}   // ✅ ADD THIS
+//   // currentUserId={user?.id}                // optional but recommended
+//   onClose={() => setIsChatModalOpen(false)}
+// />
+<JobChatModal
   jobId={job.job_id || job.id}
-  token={localStorage.getItem('token')}   // ✅ ADD THIS
-  // currentUserId={user?.id}                // optional but recommended
+  token={token}
+  currentUserId={currentUserId}
   onClose={() => setIsChatModalOpen(false)}
 />
       )}

@@ -1,11 +1,14 @@
 import React, { useState, useEffect, useRef } from 'react';
 
-export default function JobChatModal({ jobId, token, currentUserId, onClose }) {
+export default function JobChatModal({ jobId, token, currentUserId, onClose, isInline = false }) {
   const [messages, setMessages] = useState([]);
   const [newMessage, setNewMessage] = useState('');
   const messagesEndRef = useRef(null);
 
   const fetchMessages = async () => {
+    // 🟢 CRITICAL GUARD: Do not make an API request if jobId is missing or null
+    if (!jobId) return;
+
     try {
       const res = await fetch(`http://localhost:5000/api/jobs/${jobId}/messages`, {
         headers: { Authorization: `Bearer ${token}` }
@@ -21,6 +24,9 @@ export default function JobChatModal({ jobId, token, currentUserId, onClose }) {
 
   // Automatically refresh messages every 4 seconds
   useEffect(() => {
+    // 🟢 Reset messages array when switching chat channels so old messages don't flash
+    setMessages([]); 
+    
     fetchMessages(); 
     const liveFeedInterval = setInterval(fetchMessages, 4000); 
 
@@ -34,7 +40,7 @@ export default function JobChatModal({ jobId, token, currentUserId, onClose }) {
 
   const handleSendMessage = async (e) => {
     e.preventDefault();
-    if (!newMessage.trim()) return;
+    if (!newMessage.trim() || !jobId) return;
 
     try {
       const res = await fetch(`http://localhost:5000/api/jobs/${jobId}/messages`, {
@@ -56,9 +62,18 @@ export default function JobChatModal({ jobId, token, currentUserId, onClose }) {
     }
   };
 
+  // 🟢 DYNAMIC LAYOUT: Change container wrappers based on whether it is rendered inline or popup
+  const containerClass = isInline
+    ? "bg-white w-full h-full flex flex-col overflow-hidden" 
+    : "fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center z-50 p-4";
+
+  const innerModalClass = isInline 
+    ? "w-full h-full flex flex-col"
+    : "bg-white w-full max-w-md rounded-2xl shadow-xl border border-slate-100 flex flex-col h-[550px] overflow-hidden";
+
   return (
-    <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className="bg-white w-full max-w-md rounded-2xl shadow-xl border border-slate-100 flex flex-col h-[550px] overflow-hidden">
+    <div className={containerClass}>
+      <div className={innerModalClass}>
         
         {/* Chat Header */}
         <header className="p-4 bg-slate-900 text-white flex justify-between items-center">
@@ -66,13 +81,16 @@ export default function JobChatModal({ jobId, token, currentUserId, onClose }) {
             <h3 className="text-base font-semibold tracking-tight">Job Messages</h3>
             <p className="text-xs text-slate-400">Ask questions or share updates</p>
           </div>
-          <button 
-            onClick={onClose} 
-            className="text-slate-400 hover:text-white bg-slate-800 hover:bg-slate-700 h-8 w-8 rounded-full flex items-center justify-center transition"
-            aria-label="Close chat"
-          >
-            ✕
-          </button>
+          {/* 🟢 Hide the cross button if running inside your layout split screen */}
+          {!isInline && (
+            <button 
+              onClick={onClose} 
+              className="text-slate-400 hover:text-white bg-slate-800 hover:bg-slate-700 h-8 w-8 rounded-full flex items-center justify-center transition"
+              aria-label="Close chat"
+            >
+              ✕
+            </button>
+          )}
         </header>
 
         {/* Message Thread */}

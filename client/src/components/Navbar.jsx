@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
-export default function Navbar({ setShowGetStarted }) {
+export default function Navbar() {
   const { token, user, logout } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
@@ -26,8 +26,13 @@ export default function Navbar({ setShowGetStarted }) {
 
   const handleSignOut = () => {
     setIsOpen(false);
-    logout();
-    navigate('/');
+    try {
+      logout();
+    } catch (err) {
+      console.error("Auth context logoff issue, forcing manual cleanup:", err);
+      localStorage.clear(); // Safety fallback to ensure session tokens drop
+    }
+    navigate('/'); // Safely route users back to Home.jsx layout view
   };
 
   return (
@@ -44,7 +49,7 @@ export default function Navbar({ setShowGetStarted }) {
         {/* Desktop Navigation Link Cluster */}
         <div className="hidden md:flex items-center gap-8">
           
-          {/* 🌐 Real-time Workers Network Link */}
+          {/* Real-time Workers Network Link */}
           <button 
             onClick={() => handleNavClick('/workers')} 
             className={`text-sm font-bold tracking-tight transition-all duration-200 focus:outline-hidden relative py-1 cursor-pointer ${
@@ -57,7 +62,7 @@ export default function Navbar({ setShowGetStarted }) {
             )}
           </button>
 
-          {/* 💼 Marketplace Listings Link */}
+          {/* Marketplace Listings Link */}
           <button 
             onClick={() => handleNavClick('/browse-jobs')} 
             className={`text-sm font-bold tracking-tight transition-all duration-200 focus:outline-hidden relative py-1 cursor-pointer ${
@@ -80,7 +85,7 @@ export default function Navbar({ setShowGetStarted }) {
                 Sign In
               </button>
               <button 
-                onClick={() => { setShowGetStarted && setShowGetStarted(true); }} 
+                onClick={() => handleNavClick('/register/client')} // 🟢 Fixed: Matches /register/client layout boundary route
                 className="bg-blue-600 hover:bg-blue-700 text-white text-sm font-black px-4 py-2.5 rounded-xl transition-all duration-200 shadow-xs hover:shadow-md hover:shadow-blue-600/15 active:scale-98 focus:outline-hidden cursor-pointer"
               >
                 Get Started
@@ -165,7 +170,7 @@ export default function Navbar({ setShowGetStarted }) {
                 Sign In
               </button>
               <button 
-                onClick={() => { setIsOpen(false); setShowGetStarted && setShowGetStarted(true); }}
+                onClick={() => handleNavClick('/register/client')} // 🟢 Fixed: Matches mobile registration target path
                 className="w-full bg-blue-600 text-white text-center text-sm font-black py-3 rounded-xl block shadow-xs"
               >
                 Get Started

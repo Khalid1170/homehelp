@@ -5,11 +5,14 @@ import { useAuth } from '../context/AuthContext';
 // 🔓 Public Page Imports
 import Home from '../pages/public/Home';
 import Login from '../pages/auth/Login';
-import ClientRegister from '../pages/auth/ClientRegister'; // 👈 Specialized Client Registration
-import WorkerRegister from '../pages/auth/WorkerRegister'; // 👈 Specialized Worker Registration
+import ClientRegister from '../pages/auth/ClientRegister'; 
+import WorkerRegister from '../pages/auth/WorkerRegister'; 
 import BrowseJobs from '../pages/public/BrowseJobs';
 import JobFullDetails from '../pages/public/JobFullDetails';
 import WorkersDirectory from '../pages/public/WorkersDirectory'; 
+
+// 💬 Shared Page Imports
+import ChatsPage from '../components/ChatsPage'; // 👈 NEW: Centralized Live Messaging Inbox
 
 // 💼 Client Page Imports
 import ClientDashboard from '../pages/client/ClientDashboard';
@@ -17,7 +20,7 @@ import CreateJob from '../pages/client/CreateJob';
 
 // 🛠️ Worker Page Imports
 import WorkerDashboard from '../pages/worker/WorkerDashboard';
-import WorkerProfile from '../pages/worker/WorkerProfile'; // 👈 NEW: Profile View & Edit Page Component
+import WorkerProfile from '../pages/worker/WorkerProfile'; 
 import JobPitchForm from '../pages/worker/JobPitchForm';
 import StripeCallback from '../pages/worker/StripeCallback'; 
 
@@ -31,12 +34,10 @@ function ProtectedRoute({ children, allowedRoles }) {
   const { user } = useAuth();
 
   if (!user) {
-    // No active user session? Kick to authentication interface
     return <Navigate to="/login" replace />;
   }
 
   if (allowedRoles && !allowedRoles.includes(user.role)) {
-    // Role mismatch? Halt access
     return <Navigate to="/unauthorized" replace />;
   }
 
@@ -50,20 +51,23 @@ export default function AppRoutes() {
       <Route path="/" element={<Home />} />
       <Route path="/login" element={<Login />} />
       
-      {/* 💥 Split Registration Pathing */}
+      {/* Split Registration Pathing */}
       <Route path="/register/client" element={<ClientRegister />} />
       <Route path="/register/worker" element={<WorkerRegister />} />
       
-      {/* Catch-all legacy registration redirect to prevent broken links */}
+      {/* Catch-all legacy registration redirect */}
       <Route path="/register" element={<Navigate to="/register/client" replace />} />
       
       <Route path="/browse-jobs" element={<BrowseJobs />} />
-      
-      {/* 🌐 Publicly Accessible Worker Registry Directory */}
       <Route path="/workers" element={<WorkersDirectory />} />
-      
-      {/* 👁️ Publicly Accessible Job Details Profile View */}
       <Route path="/jobs/:id" element={<JobFullDetails />} />
+
+      {/* 💬 Shared Messaging Infrastructure Suite */}
+      <Route path="/chats" element={
+        <ProtectedRoute allowedRoles={['client', 'worker']}> {/* 👈 Accessible by both dashboards */}
+          <ChatsPage />
+        </ProtectedRoute>
+      } />
 
       {/* Client Sub-Suite */}
       <Route path="/client/dashboard" element={
@@ -84,21 +88,18 @@ export default function AppRoutes() {
         </ProtectedRoute>
       } />
       
-      {/* 👤 NEW: Restricted Worker Settings Profile Route */}
       <Route path="/profile" element={
         <ProtectedRoute allowedRoles={['worker']}>
           <WorkerProfile />
         </ProtectedRoute>
       } />
       
-      {/* 📝 Restricted Worker Proposal Submission Route */}
       <Route path="/jobs/:id/pitch" element={
         <ProtectedRoute allowedRoles={['worker']}>
           <JobPitchForm />
         </ProtectedRoute>
       } />
 
-      {/* 💳 Onboarding Handshake Landings for Express Connect Accounts */}
       <Route path="/stripe-callback" element={
         <ProtectedRoute allowedRoles={['worker']}>
           <StripeCallback />
@@ -112,7 +113,6 @@ export default function AppRoutes() {
         </ProtectedRoute>
       } />
       
-      {/* 💰 Integrated Escrow Balance & Payout Management Panel */}
       <Route path="/admin/payouts" element={
         <ProtectedRoute allowedRoles={['admin']}>
           <AdminPayoutDashboard />

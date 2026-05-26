@@ -15,7 +15,8 @@ import {
   AlertCircle,
   RefreshCw,
   Wallet,
-  User
+  User,
+  MessageSquare // 🟢 Added missing import
 } from 'lucide-react';
 
 export default function WorkerDashboard() {
@@ -92,7 +93,6 @@ export default function WorkerDashboard() {
 
   const jobFeed = activeTab === 'active' ? active_jobs : completed_jobs;
   
-  // Checking both onboarding verification status and explicit column flags
   const hasStripeSetup = !!worker_info?.stripe_onboarding_complete || !!worker_info?.stripe_account_id;
 
   if (loading && !dashboardData) {
@@ -141,9 +141,11 @@ export default function WorkerDashboard() {
       <main className="max-w-6xl mx-auto px-4 sm:px-6 py-12 space-y-8">
         
         {/* WELCOME BANNER PANEL */}
-        <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 p-8 rounded-3xl shadow-lg border border-slate-800 relative overflow-hidden">
+        {/* 🟢 FIXED: Removed duplicate syntax structures to align layout grid correctly */}
+        <header className="flex flex-col md:flex-row md:items-center justify-between gap-5 bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 p-8 rounded-3xl shadow-lg border border-slate-800 relative overflow-hidden">
           <div className="absolute right-0 top-0 w-64 h-64 bg-indigo-600/10 rounded-full blur-3xl pointer-events-none" />
-          <div className="space-y-1 z-10">
+          
+          <div className="space-y-1 z-10 flex-1">
             <h1 className="text-2xl font-black tracking-tight text-white">
               Hello, {worker_info?.name || 'Helper'}
             </h1>
@@ -152,13 +154,24 @@ export default function WorkerDashboard() {
             </p>
           </div>
 
-          <button
-            onClick={() => navigate('/profile')}
-            className="z-10 self-start sm:self-center px-4 py-2.5 bg-white/10 hover:bg-white/20 backdrop-blur-xs text-white text-xs font-bold rounded-xl border border-white/10 flex items-center gap-2 transition-all active:scale-98 cursor-pointer shadow-sm"
-          >
-            <User className="w-3.5 h-3.5" />
-            My Profile Settings
-          </button>
+          {/* Nav Container Stack */}
+          <div className="flex flex-wrap items-center gap-3 z-10">
+            <button
+              onClick={() => navigate('/chats')}
+              className="text-xs font-bold bg-white hover:bg-slate-50 text-slate-800 border border-slate-200 px-4 py-2.5 rounded-xl flex items-center gap-2 shadow-sm transition-all active:scale-98 cursor-pointer"
+            >
+              <MessageSquare className="w-3.5 h-3.5 text-blue-500" />
+              <span>Open Live Inbox</span>
+            </button>
+
+            <button
+              onClick={() => navigate('/profile')}
+              className="px-4 py-2.5 bg-white/10 hover:bg-white/20 backdrop-blur-xs text-white text-xs font-bold rounded-xl border border-white/10 flex items-center gap-2 transition-all active:scale-98 cursor-pointer shadow-sm"
+            >
+              <User className="w-3.5 h-3.5" />
+              My Profile Settings
+            </button>
+          </div>
         </header>
 
         {/* 🔒 READ-ONLY STRIPE GATEWAY STATUS SUMMARY */}
@@ -313,6 +326,8 @@ export default function WorkerDashboard() {
                     onToggleExpand={() => toggleExpandJob(item.job_id || item.id)}
                     hasStripeSetup={hasStripeSetup}
                     onPayoutSuccess={fetchDashboardData}
+                    token={token}
+                    currentUserId={worker_info?.user_id}
                   />
                 </div>
               ))
