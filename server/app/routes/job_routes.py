@@ -89,13 +89,19 @@ def get_client_jobs():
     ]), 200
 
 
-# =========================
+## =========================
 # GET OPEN PAID JOBS
 # =========================
 @job_bp.route("/jobs/open", methods=["GET"])
 def get_open_jobs():
     jobs = (
-        Job.query.filter_by(status="open", payment_status="paid")
+        # Use .filter() instead of .filter_by() for complex inequality logic
+        Job.query.filter(
+            Job.status != "accepted",   # 🚀 Filters out jobs that have been accepted by a worker
+            Job.status != "assigned",   # Keeps historically assigned jobs hidden
+            Job.status != "completed",  # Keeps historically completed jobs hidden
+            Job.payment_status == "paid"
+        )
         .options(joinedload(Job.client))
         .order_by(Job.created_at.desc())
         .all()
@@ -119,7 +125,6 @@ def get_open_jobs():
         }
         for job in jobs
     ]), 200
-
 
 # =========================
 # GET SINGLE JOB
@@ -296,7 +301,7 @@ def approve_worker(app_id):
     if not application:
         return jsonify({"error": "Application not found"}), 404
 
-    job = application.job
+    job = application.associated_job
     if job.client_id != user.id:
         return jsonify({"error": "Unauthorized"}), 403
 
@@ -786,93 +791,93 @@ def get_worker_dashboard():
     }), 200
 
 
-# =========================
-# CLIENT DASHBOARD
-# =========================
-@job_bp.route("/client/dashboard", methods=["GET"])
-@jwt_required()
-def get_client_dashboard():
-    user = User.query.get(get_jwt_identity())
+# # =========================
+# # CLIENT DASHBOARD
+# # =========================
+# @job_bp.route("/client/dashboard", methods=["GET"])
+# @jwt_required()
+# def get_client_dashboard():
+#     user = User.query.get(get_jwt_identity())
 
-    if not user or user.role != "client":
-        return jsonify({"error": "Unauthorized"}), 403
+#     if not user or user.role != "client":
+#         return jsonify({"error": "Unauthorized"}), 403
 
-    # Optimization: pre-fetch relationships to prevent database thrashing
-    jobs = Job.query.filter_by(client_id=user.id).options(
-        joinedload(Job.applications).joinedload(JobApplication.worker).joinedload(Worker.user)
-    ).all()
+#     # Optimization: pre-fetch relationships to prevent database thrashing
+#     jobs = Job.query.filter_by(client_id=user.id).options(
+#         joinedload(Job.applications).joinedload(JobApplication.worker).joinedload(Worker.user)
+#     ).all()
 
-    active_jobs = []
-    completed_jobs = []
-    total_spent = 0.0
+#     active_jobs = []
+#     completed_jobs = []
+#     total_spent = 0.0
 
-    for job in jobs:
-        if job.amount_paid:
-            total_spent += float(job.amount_paid)
+#     for job in jobs:
+#         if job.amount_paid:
+#             total_spent += float(job.amount_paid)
 
-        worker_data = None
-        if job.worker_id:
-            worker = Worker.query.get(job.worker_id)
-            if worker and worker.user:
-                worker_data = {
-                    "worker_id": worker.id,
-                    "name": worker.user.full_name,
-                    "rating": worker.average_rating
-                }
+#         worker_data = None
+#         if job.worker_id:
+#             worker = Worker.query.get(job.worker_id)
+#             if worker and worker.user:
+#                 worker_data = {
+#                     "worker_id": worker.id,
+#                     "name": worker.user.full_name,
+#                     "rating": worker.average_rating
+#                 }
 
-        # Build application profiles array for candidate evaluation
-        apps_list = []
-        for app in job.applications:
-            if app.status == "pending" and app.worker and app.worker.user:
-                apps_list.append({
-                    "application_id": app.id,
-                    "worker_id": app.worker.id,
-                    "name": app.worker.user.full_name,
-                    "rating": app.worker.average_rating,
-                    "worker_message": app.worker_message
-                })
+#         # Build application profiles array for candidate evaluation
+#         apps_list = []
+#         for app in job.applications:
+#             if app.status == "pending" and app.worker and app.worker.user:
+#                 apps_list.append({
+#                     "application_id": app.id,
+#                     "worker_id": app.worker.id,
+#                     "name": app.worker.user.full_name,
+#                     "rating": app.worker.average_rating,
+#                     "worker_message": app.worker_message
+#                 })
 
-        review = Review.query.filter_by(job_id=job.id).first()
-        review_data = None
-        if review:
-            review_data = {
-                "review_id": review.id,
-                "rating": review.rating,
-                "comment": review.comment
-            }
+#         review = Review.query.filter_by(job_id=job.id).first()
+#         review_data = None
+#         if review:
+#             review_data = {
+#                 "review_id": review.id,
+#                 "rating": review.rating,
+#                 "comment": review.comment
+#             }
 
-        job_data = {
-            "job_id": job.id,
-            "title": job.title,
-            "budget": job.budget,
-            "status": job.status,
-            "payment_status": job.payment_status,
-            "amount_paid": job.amount_paid,
-            "worker": worker_data,
-            "incoming_applications": apps_list,  # Front-end feeds candidate cards directly from here
-            "awaiting_worker_approval": job.status == "pending_client_acceptance",
-            "review": review_data
-        }
+#         job_data = {
+#             "job_id": job.id,
+#             "title": job.title,
+#             "budget": job.budget,
+#             "status": job.status,
+#             "payment_status": job.payment_status,
+#             "amount_paid": job.amount_paid,
+#             "worker": worker_data,
+#             "incoming_applications": apps_list,  # Front-end feeds candidate cards directly from here
+#             "awaiting_worker_approval": job.status == "pending_client_acceptance",
+#             "review": review_data
+#         }
 
-        if job.status == "completed":
-            completed_jobs.append(job_data)
-        else:
-            active_jobs.append(job_data)
+#         if job.status == "completed":
+#             completed_jobs.append(job_data)
+#         else:
+#             active_jobs.append(job_data)
 
-    return jsonify({
-        "client_info": {
-            "name": user.full_name,
-            "email": user.email
-        },
-        "metrics": {
-            "total_spent": round(total_spent, 2),
-            "total_jobs": len(jobs),
-            "completed_jobs": len(completed_jobs),
-            "active_jobs": len(active_jobs)
-        },
-        "active_jobs": active_jobs,
-        "completed_jobs": completed_jobs
-    }), 200
+#     return jsonify({
+#         "client_info": {
+#             "name": user.full_name,
+#             "email": user.email
+#         },
+#         "metrics": {
+#             "total_spent": round(total_spent, 2),
+#             "total_jobs": len(jobs),
+#             "completed_jobs": len(completed_jobs),
+#             "active_jobs": len(active_jobs)
+#         },
+#         "active_jobs": active_jobs,
+#         "completed_jobs": completed_jobs
+#     }), 200
 
 
 # =========================

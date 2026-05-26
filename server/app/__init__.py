@@ -8,6 +8,8 @@ from .routes.job_routes import job_bp
 from .routes.admin_routes import admin_bp
 from .routes.review_routes import review_bp
 from .routes.worker_routes import workers_bp
+from .routes.client_routes import client_bp
+from app.routes.chat_routes import chat_bp
 
 from flask import jsonify
 
@@ -39,6 +41,8 @@ def create_app():
     app.register_blueprint(admin_bp)
     app.register_blueprint(review_bp)
     app.register_blueprint(workers_bp)
+    app.register_blueprint(client_bp)
+    app.register_blueprint(chat_bp)
 
     # Register Global Error Handlers
     register_error_handlers(app)

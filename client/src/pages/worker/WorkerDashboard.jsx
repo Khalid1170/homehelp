@@ -14,7 +14,8 @@ import {
   CreditCard,
   AlertCircle,
   RefreshCw,
-  Wallet
+  Wallet,
+  User
 } from 'lucide-react';
 
 export default function WorkerDashboard() {
@@ -28,7 +29,6 @@ export default function WorkerDashboard() {
 
   const [activeTab, setActiveTab] = useState('active');
   const [expandedJobId, setExpandedJobId] = useState(null);
-  const [savingStripe, setSavingStripe] = useState(false);
 
   const fetchDashboardData = useCallback(async () => {
     setLoading(true);
@@ -79,38 +79,6 @@ export default function WorkerDashboard() {
     }
   }, [location.state, location.pathname, navigate, fetchDashboardData]);
 
-  const handleConnectStripe = async (e) => {
-    e.preventDefault();
-    if (savingStripe) return;
-    setSavingStripe(true);
-
-    try {
-      const res = await fetch('http://localhost:5000/worker/connect-stripe', {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
-
-      const data = await res.json();
-
-      if (!res.ok) {
-        throw new Error(data.error || 'Failed to connect with Stripe.');
-      }
-
-      if (data.onboarding_url) {
-        window.location.href = data.onboarding_url;
-      } else {
-        throw new Error('Stripe setup link was not found.');
-      }
-    } catch (err) {
-      alert(err.message);
-    } finally {
-      setSavingStripe(false);
-    }
-  };
-
   const toggleExpandJob = (jobId) => {
     setExpandedJobId(prevId => (prevId === jobId ? null : jobId));
   };
@@ -123,7 +91,9 @@ export default function WorkerDashboard() {
   } = dashboardData || {};
 
   const jobFeed = activeTab === 'active' ? active_jobs : completed_jobs;
-  const hasStripeSetup = !!worker_info?.stripe_account_id;
+  
+  // Checking both onboarding verification status and explicit column flags
+  const hasStripeSetup = !!worker_info?.stripe_onboarding_complete || !!worker_info?.stripe_account_id;
 
   if (loading && !dashboardData) {
     return (
@@ -168,7 +138,7 @@ export default function WorkerDashboard() {
     <div className="bg-slate-50/60 min-h-screen font-sans antialiased text-slate-800">
       <Navbar />
 
-      <main className="max-w-6xl mx-auto px-4 sm:px-6 py-12 space-y-10">
+      <main className="max-w-6xl mx-auto px-4 sm:px-6 py-12 space-y-8">
         
         {/* WELCOME BANNER PANEL */}
         <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 p-8 rounded-3xl shadow-lg border border-slate-800 relative overflow-hidden">
@@ -181,69 +151,48 @@ export default function WorkerDashboard() {
               Track your earnings, manage your tasks, and view your active jobs.
             </p>
           </div>
+
+          <button
+            onClick={() => navigate('/profile')}
+            className="z-10 self-start sm:self-center px-4 py-2.5 bg-white/10 hover:bg-white/20 backdrop-blur-xs text-white text-xs font-bold rounded-xl border border-white/10 flex items-center gap-2 transition-all active:scale-98 cursor-pointer shadow-sm"
+          >
+            <User className="w-3.5 h-3.5" />
+            My Profile Settings
+          </button>
         </header>
 
-        {/* STRIPE PAYOUT GATEWAY STATUS */}
-        <section className="bg-white border border-slate-200/70 rounded-3xl shadow-xs overflow-hidden transition-all duration-300 hover:shadow-md">
-          <div className="px-6 py-4 border-b border-slate-100 bg-slate-50/50 flex items-center justify-between gap-4">
-            <div className="flex items-center gap-2.5">
-              <div className="w-8 h-8 rounded-lg bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600">
-                <CreditCard className="w-4 h-4" />
-              </div>
-              <h3 className="text-sm font-black text-slate-900 tracking-tight">
-                Bank Payout Setup
-              </h3>
+        {/* 🔒 READ-ONLY STRIPE GATEWAY STATUS SUMMARY */}
+        <div className="flex items-center justify-between p-4 bg-white border border-slate-200/60 rounded-2xl shadow-xs">
+          <div className="flex items-center gap-3">
+            <div className={`w-8 h-8 rounded-xl flex items-center justify-center border ${
+              hasStripeSetup ? 'bg-emerald-50 border-emerald-100 text-emerald-600' : 'bg-amber-50 border-amber-100 text-amber-600'
+            }`}>
+              <CreditCard className="w-4 h-4" />
             </div>
-            <span
-              className={`text-[10px] font-black uppercase tracking-wider px-2.5 py-1 rounded-lg border select-none ${
-                hasStripeSetup
-                  ? 'bg-emerald-50 text-emerald-700 border-emerald-200/60'
-                  : 'bg-amber-50 text-amber-700 border-amber-200/60'
-              }`}
-            >
-              {hasStripeSetup ? 'Connected' : 'Action Required'}
-            </span>
+            <div>
+              <p className="text-xs font-black text-slate-900 tracking-tight">Payout Account Link Status</p>
+              <p className="text-[11px] text-slate-400 font-medium">
+                {hasStripeSetup 
+                  ? "Stripe is fully setup and authorized to manage platform transfers." 
+                  : "Stripe payout configurations missing. Visit Profile to link configuration."}
+              </p>
+            </div>
           </div>
-
-          <div className="p-6 sm:p-8 text-center">
-            {hasStripeSetup ? (
-              <div className="flex flex-col sm:flex-row items-center justify-center gap-3 bg-slate-50/60 border border-slate-100 p-4 rounded-2xl max-w-xl mx-auto">
-                <Wallet className="w-4 h-4 text-slate-400 shrink-0" />
-                <p className="text-sm text-slate-600 font-bold tracking-tight">
-                  Stripe Account Linked:{' '}
-                  <span className="font-mono bg-white border border-slate-200 px-2 py-0.5 rounded-lg text-indigo-600 text-xs">
-                    {worker_info?.stripe_account_id}
-                  </span>
-                </p>
-              </div>
-            ) : (
-              <div className="max-w-md mx-auto space-y-4">
-                <p className="text-xs text-slate-500 font-semibold leading-relaxed">
-                  We use Stripe to safely and directly transfer your earnings to your bank account. Set it up below to start receiving payouts automatically.
-                </p>
-                <button
-                  onClick={handleConnectStripe}
-                  disabled={savingStripe}
-                  className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white text-xs font-black px-6 py-3 rounded-xl transition-all duration-300 flex items-center justify-center gap-2 mx-auto shadow-xs hover:shadow-md hover:shadow-blue-600/15 active:scale-98 cursor-pointer"
-                >
-                  <CreditCard className="w-4 h-4" />
-                  {savingStripe ? 'Connecting...' : 'Set Up Payouts'}
-                </button>
-              </div>
-            )}
-          </div>
-        </section>
+          <span className={`text-[10px] font-black uppercase tracking-wider px-2.5 py-1 rounded-lg border ${
+            hasStripeSetup ? 'bg-emerald-50 text-emerald-700 border-emerald-200/60' : 'bg-amber-50 text-amber-700 border-amber-200/60'
+          }`}>
+            {hasStripeSetup ? 'Stripe Ready' : 'Setup Needed'}
+          </span>
+        </div>
 
         {/* METRICS DASHBOARD GRID */}
         <section className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4">
-          
-          {/* Jobs Completed */}
           <div className="bg-white border border-slate-200/70 rounded-2xl p-3 sm:p-4 md:p-5 flex items-center gap-3 sm:gap-4 shadow-xs hover:shadow-sm transition duration-200">
             <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-slate-50 text-slate-500 border border-slate-100 flex items-center justify-center shrink-0">
               <Briefcase className="w-4 h-4" />
             </div>
             <div className="min-w-0 flex-1">
-              <span className="block text-[9px] sm:text-[10px] font-black uppercase tracking-wider text-slate-400 truncate whitespace-normal sm:whitespace-nowrap leading-tight">
+              <span className="block text-[9px] sm:text-[10px] font-black uppercase tracking-wider text-slate-400 truncate leading-tight">
                 Jobs Done
               </span>
               <span className="text-base sm:text-xl font-black text-slate-900 block mt-0.5 truncate">
@@ -252,13 +201,12 @@ export default function WorkerDashboard() {
             </div>
           </div>
 
-          {/* Gross Earnings */}
           <div className="bg-white border border-slate-200/70 rounded-2xl p-3 sm:p-4 md:p-5 flex items-center gap-3 sm:gap-4 shadow-xs hover:shadow-sm transition duration-200">
             <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-slate-50 text-slate-500 border border-slate-100 flex items-center justify-center shrink-0">
               <TrendingUp className="w-4 h-4" />
             </div>
             <div className="min-w-0 flex-1">
-              <span className="block text-[9px] sm:text-[10px] font-black uppercase tracking-wider text-slate-400 truncate whitespace-normal sm:whitespace-nowrap leading-tight">
+              <span className="block text-[9px] sm:text-[10px] font-black uppercase tracking-wider text-slate-400 truncate leading-tight">
                 Total Made
               </span>
               <span className="text-base sm:text-xl font-black text-slate-900 block mt-0.5 truncate">
@@ -267,13 +215,12 @@ export default function WorkerDashboard() {
             </div>
           </div>
 
-          {/* Platform Fees */}
           <div className="bg-white border border-slate-200/70 rounded-2xl p-3 sm:p-4 md:p-5 flex items-center gap-3 sm:gap-4 shadow-xs hover:shadow-sm transition duration-200">
             <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-rose-50/50 text-rose-500 border border-rose-100/50 flex items-center justify-center shrink-0">
               <Percent className="w-4 h-4" />
             </div>
             <div className="min-w-0 flex-1">
-              <span className="block text-[9px] sm:text-[10px] font-black uppercase tracking-wider text-slate-400 truncate whitespace-normal sm:whitespace-nowrap leading-tight">
+              <span className="block text-[9px] sm:text-[10px] font-black uppercase tracking-wider text-slate-400 truncate leading-tight">
                 App Fee (15%)
               </span>
               <span className="text-base sm:text-xl font-black text-slate-400 block mt-0.5 truncate">
@@ -282,13 +229,12 @@ export default function WorkerDashboard() {
             </div>
           </div>
 
-          {/* Net Earnings */}
           <div className="bg-white border border-slate-200/70 rounded-2xl p-3 sm:p-4 md:p-5 flex items-center gap-3 sm:gap-4 shadow-xs hover:shadow-sm transition duration-200">
             <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-indigo-50 border border-indigo-100/70 flex items-center justify-center shrink-0 text-indigo-600">
               <DollarSign className="w-4 h-4" />
             </div>
             <div className="min-w-0 flex-1">
-              <span className="block text-[9px] sm:text-[10px] font-black uppercase tracking-wider text-indigo-600/70 truncate whitespace-normal sm:whitespace-nowrap leading-tight">
+              <span className="block text-[9px] sm:text-[10px] font-black uppercase tracking-wider text-indigo-600/70 truncate leading-tight">
                 Take Home
               </span>
               <span className="text-base sm:text-xl font-black text-slate-900 block mt-0.5 truncate">
@@ -297,13 +243,12 @@ export default function WorkerDashboard() {
             </div>
           </div>
 
-          {/* Requests Pending */}
           <div className="bg-white border border-amber-200/70 rounded-2xl p-3 sm:p-4 md:p-5 flex items-center gap-3 sm:gap-4 shadow-xs hover:shadow-sm transition duration-200">
             <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-amber-50 text-amber-600 border border-amber-100 flex items-center justify-center shrink-0">
               <Clock className="w-4 h-4" />
             </div>
             <div className="min-w-0 flex-1">
-              <span className="block text-[9px] sm:text-[10px] font-black uppercase tracking-wider text-amber-600/70 truncate whitespace-normal sm:whitespace-nowrap leading-tight">
+              <span className="block text-[9px] sm:text-[10px] font-black uppercase tracking-wider text-amber-600/70 truncate leading-tight">
                 Processing
               </span>
               <span className="text-base sm:text-xl font-black text-amber-600 block mt-0.5 truncate">
@@ -312,13 +257,12 @@ export default function WorkerDashboard() {
             </div>
           </div>
 
-          {/* Payouts Settled */}
           <div className="bg-white border border-emerald-200/70 rounded-2xl p-3 sm:p-4 md:p-5 flex items-center gap-3 sm:gap-4 shadow-xs hover:shadow-sm transition duration-200">
             <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-emerald-50 text-emerald-600 border border-emerald-100 flex items-center justify-center shrink-0">
               <CheckCircle className="w-4 h-4" />
             </div>
             <div className="min-w-0 flex-1">
-              <span className="block text-[9px] sm:text-[10px] font-black uppercase tracking-wider text-emerald-600/70 truncate whitespace-normal sm:whitespace-nowrap leading-tight">
+              <span className="block text-[9px] sm:text-[10px] font-black uppercase tracking-wider text-emerald-600/70 truncate leading-tight">
                 Paid Out
               </span>
               <span className="text-base sm:text-xl font-black text-emerald-600 block mt-0.5 truncate">
@@ -356,7 +300,6 @@ export default function WorkerDashboard() {
             </button>
           </div>
 
-          {/* RENDER DYNAMIC CARD INJECTION */}
           <div className="space-y-4">
             {jobFeed.length > 0 ? (
               jobFeed.map((item) => (

@@ -9,10 +9,24 @@ const getHeaders = () => {
 };
 
 export const clientApi = {
-  // Fetch overall dashboard layout stats, active listings, and completed cards
+  // --- FIXED: Added missing '/api' prefix to match backend routing ---
   getDashboard: async () => {
-    const res = await fetch(`${API_BASE_URL}/client/dashboard`, { headers: getHeaders() });
+    const res = await fetch(`${API_BASE_URL}/api/client/dashboard`, { headers: getHeaders() });
     if (!res.ok) throw new Error('Failed to load dashboard metrics');
+    return res.json();
+  },
+
+  // --- NEW: Added missing profile update endpoint for your modal ---
+  updateProfile: async (profileData) => {
+    const res = await fetch(`${API_BASE_URL}/api/client/profile`, {
+      method: 'PUT',
+      headers: getHeaders(),
+      body: JSON.stringify(profileData)
+    });
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.message || 'Failed to update account profile parameters');
+    }
     return res.json();
   },
 
@@ -86,9 +100,7 @@ export const clientApi = {
     return res.json();
   },
 
-  // ==========================================
-  // SUBMIT CLIENT EVALUATION FEEDBACK
-  // ==========================================
+  // Submit client evaluation feedback
   submitReview: async (jobId, reviewData) => {
     const res = await fetch(`${API_BASE_URL}/jobs/${jobId}/review`, {
       method: 'POST',

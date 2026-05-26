@@ -10,8 +10,10 @@ import {
   Loader2,
   CheckCircle2,
   DollarSign,
-  XCircle
+  XCircle,
+  MessageSquare
 } from 'lucide-react';
+import JobChatModal from './JobChatModal';
 
 export default function WorkersJobCard({
   job,
@@ -22,6 +24,7 @@ export default function WorkersJobCard({
 }) {
   const [requesting, setRequesting] = useState(false);
   const [markingFinished, setMarkingFinished] = useState(false);
+  const [isChatModalOpen, setIsChatModalOpen] = useState(false);
 
   // Tracking request state as string tokens: 'idle' | 'pending' | 'rejected'
   // Fallback defaults logic parsing backend state keys securely
@@ -251,6 +254,21 @@ export default function WorkersJobCard({
               </div>
 
               <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
+
+                {/* 🟢 NEW: Live Chat Button (Visible if accepted, in progress, or completed) */}
+{/* 🟢 LIVE CHAT BUTTON (ADD ONLY - NO OTHER CHANGES) */}
+{(job.status === 'accepted' || job.status === 'in_progress' || job.status === 'completed') && (
+  <button
+    onClick={(e) => {
+      e.stopPropagation(); // prevents card toggle
+      setIsChatModalOpen(true);
+    }}
+    className="w-full sm:w-auto text-xs bg-slate-900 hover:bg-slate-800 text-white font-bold px-4 py-2.5 rounded-xl flex items-center justify-center gap-2 shadow-sm transition-colors"
+  >
+    <MessageSquare className="w-3.5 h-3.5" />
+    <span>Live Chat</span>
+  </button>
+)}
                 {(job.status === 'accepted' || job.status === 'in_progress') && (
                   <button
                     onClick={handleMarkFinished}
@@ -367,6 +385,15 @@ export default function WorkersJobCard({
                   <span>No review submitted yet.</span>
                 </div>
               )}
+              {/* 🟢 NEW: Render the Chat Modal when state is true */}
+      {isChatModalOpen && (
+        <JobChatModal
+  jobId={job.job_id || job.id}
+  token={localStorage.getItem('token')}   // ✅ ADD THIS
+  // currentUserId={user?.id}                // optional but recommended
+  onClose={() => setIsChatModalOpen(false)}
+/>
+      )}
             </div>
           </div>
 

@@ -40,8 +40,11 @@ class Job(db.Model):
 
     # Relationships
     client = db.relationship('User', backref='jobs')
-    # ADDED THIS LINE HERE 🚀
     worker = db.relationship('Worker', backref='assigned_jobs') 
+    
+    # FIX 1: Point to 'JobApplication' instead of 'Application'
+    # Keeping the name 'incoming_applications' so your code reads cleanly
+    incoming_applications = db.relationship('JobApplication', backref='associated_job', lazy=True)
 
 
 class JobApplication(db.Model):
@@ -51,12 +54,10 @@ class JobApplication(db.Model):
     job_id = db.Column(db.Integer, db.ForeignKey('jobs.id'), nullable=False)
     worker_id = db.Column(db.Integer, db.ForeignKey('workers.id'), nullable=False)
     
-    # The pitch text field 🚀
     worker_message = db.Column(db.Text, nullable=True) 
     
     status = db.Column(db.String(20), default="pending")  # pending, approved, declined
     created_at = db.Column(db.DateTime, default=db.func.current_timestamp())
 
-    # Relationships for fast object access
-    job = db.relationship('Job', backref='applications')
-    worker = db.relationship('Worker', backref='applications')
+    # FIX 2: Relies on the backref specified in the Job class instead of building a competing backref string
+    worker = db.relationship('Worker', backref='job_applications')

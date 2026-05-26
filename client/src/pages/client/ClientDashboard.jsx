@@ -2,8 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { clientApi } from '../../services/clientApi';
 import Navbar from '../../components/Navbar'; 
 import Footer from '../../components/Footer'; 
+import JobChatModal from '../../components/JobChatModal';
+import { useNavigate } from 'react-router-dom';
 
 export default function ClientDashboard() {
+  const navigate = useNavigate();
+  const [activeChatJobId, setActiveChatJobId] = useState(null);
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -12,18 +16,18 @@ export default function ClientDashboard() {
   // Interactive UI expansion state to trace open job items
   const [expandedJobId, setExpandedJobId] = useState(null);
 
-  // Job Posting Drawer State management 
-  const [showPostModal, setShowPostModal] = useState(false);
-  const [formData, setFormData] = useState({ title: '', description: '', budget: '', category: '', location_text: '' });
-  const [formSubmitLoading, setFormSubmitLoading] = useState(false);
-
   // Selected focused context for reviewing applicants
   const [focusedJob, setFocusedJob] = useState(null);
 
-  // --- NEW: Review Modal & Form States ---
+  // Review Modal & Form States
   const [focusedReviewJob, setFocusedReviewJob] = useState(null);
   const [reviewForm, setReviewForm] = useState({ rating: 5, comment: '' });
   const [reviewSubmitLoading, setReviewSubmitLoading] = useState(false);
+
+  // --- Profile View & Edit States ---
+  const [showProfileModal, setShowProfileModal] = useState(false);
+  const [profileForm, setProfileForm] = useState({ name: '', email: '', phone: '', company: '' });
+  const [profileUpdateLoading, setProfileUpdateLoading] = useState(false);
 
   useEffect(() => {
     loadDashboardData();
@@ -34,6 +38,15 @@ export default function ClientDashboard() {
       setLoading(true);
       const metricsData = await clientApi.getDashboard();
       setData(metricsData);
+      
+      if (metricsData.client_info) {
+        setProfileForm({
+          name: metricsData.client_info.name || '',
+          email: metricsData.client_info.email || '',
+          phone: metricsData.client_info.phone || '',
+          company: metricsData.client_info.company || '',
+        });
+      }
     } catch (err) {
       setError(err.message);
     } finally {
@@ -41,27 +54,26 @@ export default function ClientDashboard() {
     }
   };
 
+  const handleProfileUpdateSubmit = async (e) => {
+    e.preventDefault();
+    try {
+      setProfileUpdateLoading(true);
+      await clientApi.updateProfile(profileForm);
+      setShowProfileModal(false);
+      await loadDashboardData();
+    } catch (err) {
+      alert(err.message);
+    } finally {
+      setProfileUpdateLoading(false);
+    }
+  };
+
   const toggleExpandJob = (jobId) => {
     setExpandedJobId(expandedJobId === jobId ? null : jobId);
   };
 
-  const handlePostJobSubmit = async (e) => {
-    e.preventDefault();
-    try {
-      setFormSubmitLoading(true);
-      await clientApi.createJob(formData);
-      setShowPostModal(false);
-      setFormData({ title: '', description: '', budget: '', category: '', location_text: '' });
-      loadDashboardData();
-    } catch (err) {
-      alert(err.message);
-    } finally {
-      setFormSubmitLoading(false);
-    }
-  };
-
   const handleCancelJob = async (jobId, e) => {
-    e.stopPropagation(); // Stop parent container file card expansion trigger toggle
+    e.stopPropagation(); 
     if (!window.confirm('Are you sure you want to delete and cancel this job listing?')) return;
     try {
       await clientApi.deleteJob(jobId);
@@ -83,10 +95,13 @@ export default function ClientDashboard() {
     }
   };
 
-  const handleApproveCandidate = async (appId) => {
+  // 💬 FIXED: Auto-opens chat context directly upon acceptance confirmation
+  const handleApproveCandidate = async (appId, jobId) => {
     try {
       await clientApi.approveWorker(appId);
       setFocusedJob(null);
+      setActiveChatJobId(jobId); // 🔥 Pops open chat modal frame immediately
+      setExpandedJobId(jobId);   // Expands item panel view for clarity
       loadDashboardData();
     } catch (err) {
       alert(err.message);
@@ -97,10 +112,15 @@ export default function ClientDashboard() {
     try {
       await clientApi.declineWorker(appId);
       if (focusedJob) {
-        setFocusedJob({
-          ...focusedJob,
-          incoming_applications: focusedJob.incoming_applications.filter(a => a.application_id !== appId)
-        });
+        const updatedApplications = focusedJob.incoming_applications.filter(a => a.application_id !== appId);
+        if (updatedApplications.length === 0) {
+          setFocusedJob(null);
+        } else {
+          setFocusedJob({
+            ...focusedJob,
+            incoming_applications: updatedApplications
+          });
+        }
       }
       loadDashboardData();
     } catch (err) {
@@ -119,12 +139,10 @@ export default function ClientDashboard() {
     }
   };
 
-  // --- NEW: Submit Review Handler ---
   const handleReviewSubmit = async (e) => {
     e.preventDefault();
     try {
       setReviewSubmitLoading(true);
-      // Assumes your clientApi has a submitReview method taking (jobId, { rating, comment })
       await clientApi.submitReview(focusedReviewJob.job_id, {
         rating: Number(reviewForm.rating),
         comment: reviewForm.comment
@@ -152,36 +170,61 @@ export default function ClientDashboard() {
     </div>
   );
 
-  const displayedJobs = activeTab === 'active' ? data.active_jobs : data.completed_jobs;
+  const displayedJobs = activeTab === 'active' ? (data?.active_jobs || []) : (data?.completed_jobs || []);
 
   return (
     <div className="min-h-screen bg-slate-50/60 flex flex-col">
-      <Navbar setShowGetStarted={() => setShowPostModal(true)} />
+      <Navbar setShowGetStarted={() => navigate('/create-job')} />
       
       <div className="bg-white border-b border-slate-200/80 sticky top-[65px] z-30 py-6">
         <div className="max-w-6xl mx-auto px-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
             <h1 className="text-2xl font-black text-slate-900 tracking-tight">Control Dashboard</h1>
-            <p className="text-slate-500 text-sm font-medium mt-0.5">Welcome back, {data.client_info?.name || 'Client'}</p>
+            <p className="text-slate-500 text-sm font-medium mt-0.5">
+              Welcome back,{' '}
+              <span 
+                onClick={() => setShowProfileModal(true)} 
+                className="text-blue-600 underline cursor-pointer hover:text-blue-700 transition"
+              >
+                {data?.client_info?.name || 'Client'}
+              </span>
+            </p>
           </div>
-          <button 
-            onClick={() => setShowPostModal(true)}
-            className="bg-blue-600 hover:bg-blue-700 text-white font-bold text-sm px-5 py-3 rounded-xl transition duration-200 shadow-xs hover:shadow-md hover:shadow-blue-600/15 active:scale-98 self-start sm:self-center"
-          >
-            Deploy New Job +
-          </button>
+          
+          <div className="flex items-center gap-2 self-start sm:self-center relative z-50">
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowProfileModal(true);
+              }}
+              className="border border-slate-200 hover:bg-slate-50 text-slate-700 font-bold text-sm px-4 py-3 rounded-xl transition duration-200"
+            >
+              Account Profile ⚙️
+            </button>
+            
+            <button 
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                navigate('/client/create-job');
+              }}
+              className="bg-blue-600 hover:bg-blue-700 text-white font-bold text-sm px-5 py-3 rounded-xl transition duration-200 shadow-xs hover:shadow-md hover:shadow-blue-600/15 active:scale-98 cursor-pointer"
+            >
+              Deploy New Job +
+            </button>
+          </div>
         </div>
       </div>
 
       <div className="max-w-6xl mx-auto w-full px-4 mt-8 flex-1 pb-16">
-        
         {/* Core Metrics Grid */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           {[
-            { label: 'Total Placed Capital', value: `$${data.metrics.total_spent.toFixed(2)}`, color: 'text-slate-900' },
-            { label: 'Pipeline Postings', value: data.metrics.total_jobs, color: 'text-blue-600' },
-            { label: 'Active Projects', value: data.metrics.active_jobs, color: 'text-amber-600' },
-            { label: 'Completed Jobs', value: data.metrics.completed_jobs, color: 'text-emerald-600' }
+            { label: 'Total Placed Capital', value: `$${(data?.metrics?.total_spent || 0).toFixed(2)}`, color: 'text-slate-900' },
+            { label: 'Pipeline Postings', value: data?.metrics?.total_jobs || 0, color: 'text-blue-600' },
+            { label: 'Active Projects', value: data?.metrics?.active_jobs || 0, color: 'text-amber-600' },
+            { label: 'Completed Jobs', value: data?.metrics?.completed_jobs || 0, color: 'text-emerald-600' }
           ].map((m, idx) => (
             <div key={idx} className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs">
               <span className="text-xs font-semibold text-slate-400 tracking-wider uppercase block">{m.label}</span>
@@ -193,32 +236,56 @@ export default function ClientDashboard() {
         {/* Tab Switch Layout */}
         <div className="flex gap-2 mt-10 border-b border-slate-200 pb-3">
           <button 
+            type="button"
             onClick={() => { setActiveTab('active'); setExpandedJobId(null); }}
             className={`px-4 py-2 text-sm font-bold rounded-lg transition-all duration-200 ${activeTab === 'active' ? 'bg-blue-50 text-blue-600' : 'text-slate-500 hover:text-slate-800'}`}
           >
-            Active Pipelines ({data.active_jobs.length})
+            Active Pipelines ({data?.active_jobs?.length || 0})
           </button>
           <button 
+            type="button"
             onClick={() => { setActiveTab('completed'); setExpandedJobId(null); }}
             className={`px-4 py-2 text-sm font-bold rounded-lg transition-all duration-200 ${activeTab === 'completed' ? 'bg-emerald-50 text-emerald-600' : 'text-slate-500 hover:text-slate-800'}`}
           >
-            Completed Vault ({data.completed_jobs.length})
+            Completed Vault ({data?.completed_jobs?.length || 0})
           </button>
         </div>
 
         {/* Jobs Feed Wrapper Container */}
         <div className="grid grid-cols-1 gap-4 mt-6">
           {displayedJobs.length === 0 ? (
-            <div className="text-center py-20 bg-white border border-dashed border-slate-300 rounded-2xl max-w-xl mx-auto w-full px-6 flex flex-col items-center">
-              <div className="h-12 w-12 bg-slate-50 rounded-full flex items-center justify-center text-slate-400 font-bold text-lg border border-slate-100 mb-4">📂</div>
-              <p className="text-sm font-bold text-slate-800 tracking-tight">No active tracking records</p>
-              <p className="text-xs font-medium text-slate-400 mt-1 max-w-xs leading-relaxed">
-                You haven't posted any positions matching this status container profile inside your pipeline ecosystem.
+            <div className="text-center py-16 bg-linear-to-b from-white to-slate-50/50 border border-slate-200 rounded-3xl max-w-2xl mx-auto w-full px-8 flex flex-col items-center shadow-xs">
+              <div className="h-16 w-16 bg-blue-50/80 rounded-2xl flex items-center justify-center text-blue-600 text-2xl border border-blue-100/60 mb-5 shadow-inner">
+                💼
+              </div>
+              <h3 className="text-xl font-black text-slate-900 tracking-tight">
+                {activeTab === 'active' ? 'Your active pipeline is empty' : 'No historic archive data'}
+              </h3>
+              <p className="text-sm font-medium text-slate-500 mt-2 max-w-md leading-relaxed text-center">
+                {activeTab === 'active' 
+                  ? "You don't have any projects running right now. Deploy a project description block to contract top developers across our open workforce ecosystems."
+                  : "You haven't completed any project terms inside this tracking pipeline cluster yet."
+                }
               </p>
+              
+              {activeTab === 'active' && (
+                <button
+                  type="button"
+                  onClick={() => navigate('/create-job')}
+                  className="mt-6 inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-bold text-sm px-6 py-3.5 rounded-xl transition shadow-md shadow-blue-600/10 hover:shadow-lg hover:shadow-blue-600/20 active:scale-98"
+                >
+                  Post Your First Job Listing +
+                </button>
+              )}
             </div>
           ) : (
             displayedJobs.map((job) => {
               const isExpanded = expandedJobId === job.job_id;
+              
+              // 🔄 COGNITIVE CHANGE: Only display candidate pipelines if the status isn't already allocated/accepted!
+              const isAssigned = job.status === 'accepted' || job.status === 'pending_confirmation' || job.status === 'completed';
+              const hasApplicants = job.incoming_applications && job.incoming_applications.length > 0 && !isAssigned;
+              
               return (
                 <div 
                   key={job.job_id} 
@@ -227,23 +294,21 @@ export default function ClientDashboard() {
                     isExpanded ? 'border-blue-500 shadow-md ring-1 ring-blue-500/20' : 'border-slate-200/80 shadow-xs hover:border-slate-300 hover:shadow-md hover:shadow-slate-200/20'
                   }`}
                 >
-                  {/* Card Front Top Summary Line */}
                   <div className="p-6 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
                     <div className="space-y-2 max-w-xl">
                       <div className="flex items-center gap-2.5 flex-wrap">
                         <h3 className="text-lg font-bold text-slate-900 tracking-tight">{job.title}</h3>
-                        
                         <span className={`text-[10px] font-extrabold tracking-wider px-2 py-0.5 rounded-md border uppercase ${
                           job.payment_status === 'paid' ? 'bg-emerald-50 text-emerald-700 border-emerald-100' : 'bg-amber-50 text-amber-700 border-amber-100'
                         }`}>
                           {job.payment_status}
                         </span>
-
-                        <span className="text-[10px] font-extrabold tracking-wider px-2 py-0.5 rounded-md bg-slate-50 text-slate-600 border border-slate-200/60 uppercase">
-                          Status: {job.status.replace(/_/g, ' ')}
+                        <span className={`text-[10px] font-extrabold tracking-wider px-2 py-0.5 rounded-md border uppercase ${
+                          isAssigned ? 'bg-indigo-50 text-indigo-700 border-indigo-150' : 'bg-slate-50 text-slate-600 border-slate-200/60'
+                        }`}>
+                          Status: {job.status?.replace(/_/g, ' ')}
                         </span>
                       </div>
-                      
                       <div className="flex items-center gap-4">
                         <p className="text-2xl font-black text-slate-800 tracking-tight">${job.budget}</p>
                         <span className="text-xs text-blue-600 font-bold bg-blue-50/60 px-2.5 py-1 rounded-lg">
@@ -252,19 +317,21 @@ export default function ClientDashboard() {
                       </div>
                     </div>
 
-                    {/* Operational Action Block triggers */}
                     <div className="flex items-center gap-3 self-stretch lg:self-center justify-between sm:justify-end flex-wrap">
                       {job.payment_status === 'unpaid' && (
                         <button 
+                          type="button"
                           onClick={(e) => handleStripeCheckoutRedirect(job.job_id, e)}
                           className="bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold px-4 py-2.5 rounded-xl transition"
                         >
-                          Fund Escrow (Stripe) 💳
+                          Fund to make Job Live (Stripe) 💳
                         </button>
                       )}
 
-                      {job.payment_status === 'paid' && job.incoming_applications?.length > 0 && (
+                      {/* 🛠️ CONDITIONAL CHANGE: Candidate review button vanishes when someone is already hired */}
+                      {hasApplicants && (
                         <button 
+                          type="button"
                           onClick={(e) => { e.stopPropagation(); setFocusedJob(job); }}
                           className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold px-4 py-2.5 rounded-xl transition"
                         >
@@ -274,6 +341,7 @@ export default function ClientDashboard() {
 
                       {job.status === 'pending_confirmation' && (
                         <button 
+                          type="button"
                           onClick={(e) => handleConfirmReceipt(job.job_id, e)}
                           className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-4 py-2.5 rounded-xl transition"
                         >
@@ -281,8 +349,9 @@ export default function ClientDashboard() {
                         </button>
                       )}
 
-                      {job.status !== 'accepted' && job.status !== 'completed' && job.status !== 'pending_confirmation' && (
+                      {!isAssigned && (
                         <button 
+                          type="button"
                           onClick={(e) => handleCancelJob(job.job_id, e)}
                           className="border border-slate-200 hover:border-red-200 text-slate-400 hover:text-red-600 p-2.5 rounded-xl transition hover:bg-rose-50/50"
                         >
@@ -292,11 +361,54 @@ export default function ClientDashboard() {
                     </div>
                   </div>
 
-                  {/* Expandable Meta Panel Section */}
                   {isExpanded && (
-                    <div className="bg-slate-50/80 border-t border-slate-100 p-6 space-y-6 animate-fade-in cursor-default" onClick={(e) => e.stopPropagation()}>
+                    <div className="bg-slate-50/80 border-t border-slate-100 p-6 space-y-6 cursor-default" onClick={(e) => e.stopPropagation()}>
                       
-                      {/* Segment 1: Detailed Scope */}
+                      {/* --- INLINE APPLICANT FEED --- */}
+                      {/* 🛠️ CONDITIONAL CHANGE: Completely hides raw candidate submissions list if worker is assigned */}
+                      {!isAssigned && (
+                        <div className="space-y-2">
+                          <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400">
+                            Incoming Job Applications ({job.incoming_applications?.length || 0})
+                          </h4>
+                          <div className="grid grid-cols-1 gap-3">
+                            {job.incoming_applications && job.incoming_applications.length > 0 ? (
+                              job.incoming_applications.map((app) => (
+                                <div key={app.application_id} className="bg-white border border-slate-200/70 p-4 rounded-xl shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                                  <div className="space-y-1">
+                                    <div className="flex items-center gap-2">
+                                      <span className="font-bold text-slate-900 text-sm">{app.worker_name || 'Anonymous Applicant'}</span>
+                                      {app.worker_rating && <span className="text-xs font-bold text-amber-500">⭐ {app.worker_rating.toFixed(1)}</span>}
+                                    </div>
+                                    <p className="text-xs text-slate-500 italic">"{app.worker_message || 'No submission message text provided.'}"</p>
+                                  </div>
+                                  <div className="flex gap-2 shrink-0">
+                                    <button
+                                      type="button"
+                                      onClick={() => handleDeclineCandidate(app.application_id)}
+                                      className="border border-slate-200 hover:border-red-200 text-slate-600 hover:text-red-600 text-xs font-bold px-3 py-1.5 rounded-lg bg-white transition"
+                                    >
+                                      Decline
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleApproveCandidate(app.application_id, job.job_id)}
+                                      className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold px-3 py-1.5 rounded-lg transition"
+                                    >
+                                      Accept
+                                    </button>
+                                  </div>
+                                </div>
+                              ))
+                            ) : (
+                              <div className="bg-white/60 border border-dashed border-slate-200 text-center py-4 rounded-xl text-xs font-medium text-slate-400 italic">
+                                No one has submitted an application message for this listing frame yet.
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )}
+
                       <div className="space-y-1.5">
                         <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400">Full Job Specifications</h4>
                         <div className="bg-white border border-slate-200/60 rounded-xl p-4">
@@ -308,25 +420,32 @@ export default function ClientDashboard() {
                         </div>
                       </div>
 
-                      {/* Segment 2: Worker & Financial Escrow Details */}
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        
-                        {/* Worker Assignment Card */}
                         <div className="space-y-1.5">
                           <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400">Appointed Service Worker</h4>
-                          <div className="bg-white border border-slate-200/60 rounded-xl p-4 flex items-center justify-between min-h-[74px]">
-                            {job.worker ? (
-                              <div>
-                                <p className="text-sm font-bold text-slate-900">{job.worker.name}</p>
-                                <p className="text-xs font-bold text-amber-500 mt-0.5">⭐ {job.worker.rating ? `${job.worker.rating.toFixed(1)} Rating` : 'N/A Rating Frame'}</p>
-                              </div>
+                          <div className={`border rounded-xl p-4 flex items-center justify-between min-h-[74px] ${isAssigned ? 'bg-blue-50/40 border-blue-200/70' : 'bg-white border-slate-200/60'}`}>
+                            {job.appointed_worker ? (
+                              <>
+                                <div>
+                                  <p className="text-sm font-bold text-slate-900">{job.appointed_worker.name}</p>
+                                  <p className="text-xs font-bold text-amber-500 mt-0.5">⭐ {job.appointed_worker.rating ? `${job.appointed_worker.rating.toFixed(1)} Rating` : 'N/A Rating Frame'}</p>
+                                </div>
+                                {(job.status === 'accepted' || job.status === 'pending_confirmation') && (
+                                  <button
+                                    type="button"
+                                    onClick={(e) => { e.stopPropagation(); setActiveChatJobId(job.job_id); }}
+                                    className="bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold px-3.5 py-2 rounded-xl transition cursor-pointer"
+                                  >
+                                    💬 Chat with Worker
+                                  </button>
+                                )}
+                              </>
                             ) : (
                               <p className="text-xs font-semibold text-slate-400 italic">No contractor appointed to pipeline yet.</p>
                             )}
                           </div>
                         </div>
 
-                        {/* Financial Ledger Audit info */}
                         <div className="space-y-1.5">
                           <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400">Financial Settlement</h4>
                           <div className="bg-white border border-slate-200/60 rounded-xl p-4 flex items-center justify-between min-h-[74px]">
@@ -337,16 +456,12 @@ export default function ClientDashboard() {
                             <div className="text-right">
                               <span className={`text-xs font-bold px-2.5 py-1 rounded-lg inline-block border uppercase ${
                                 job.payment_status === 'paid' ? 'bg-emerald-50 text-emerald-700 border-emerald-100' : 'bg-rose-50 text-rose-700 border-rose-100'
-                              }`}>
-                                {job.payment_status === 'paid' ? 'Escrow Released' : 'Awaiting Capital'}
-                              </span>
+                              }`}>{job.payment_status === 'paid' ? 'Escrow Released' : 'Awaiting Capital'}</span>
                             </div>
                           </div>
                         </div>
-
                       </div>
 
-                      {/* Segment 3: Performance Review Feedback Engine Component */}
                       <div className="space-y-1.5">
                         <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400">Client Platform Feedback Review</h4>
                         <div className="bg-white border border-slate-200/60 rounded-xl p-4">
@@ -367,11 +482,11 @@ export default function ClientDashboard() {
                                   ? 'No evaluation feedback loop submitted for this position listing.' 
                                   : 'Feedback loops unlock once milestones achieve full closure.'}
                               </p>
-                              {/* --- NEW: Leave Review Trigger Button --- */}
                               {job.status === 'completed' && (
                                 <button
+                                  type="button"
                                   onClick={(e) => { e.stopPropagation(); setFocusedReviewJob(job); }}
-                                  className="bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs px-3 py-2 rounded-xl transition duration-150 active:scale-98"
+                                  className="bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs px-3 py-2 rounded-xl transition duration-150"
                                 >
                                   Write Review ⭐
                                 </button>
@@ -380,10 +495,8 @@ export default function ClientDashboard() {
                           )}
                         </div>
                       </div>
-
                     </div>
                   )}
-
                 </div>
               );
             })
@@ -393,85 +506,148 @@ export default function ClientDashboard() {
 
       <Footer />
 
-      {/* MODAL WINDOW A: DEPLOY POSTING FORM */}
-      {showPostModal && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-4">
-          <div className="bg-white max-w-lg w-full rounded-2xl p-6 shadow-xl border border-slate-100 flex flex-col max-h-[90vh]">
-            <div className="flex justify-between items-center pb-4 border-b border-slate-100">
-              <h2 className="text-lg font-black text-slate-900 tracking-tight">Post a New Job</h2>
-              <button onClick={() => setShowPostModal(false)} className="text-slate-400 text-2xl hover:text-slate-600 transition focus:outline-hidden">×</button>
+      {/* --- LIVE CHAT ENGINE OVERLAY LAYER --- */}
+      {activeChatJobId && (
+        <JobChatModal
+          jobId={activeChatJobId}
+          token={localStorage.getItem("token")}
+          currentUserId={data?.client_info?.id || null}
+          onClose={() => setActiveChatJobId(null)}
+        />
+      )}
+
+      {/* --- RESPONSIVE GLASSMORPHISM ACCOUNT PROFILE EDITOR --- */}
+      {showProfileModal && (
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-md z-50 flex items-center justify-center p-4 transition-all duration-300">
+          <div className="w-full max-w-lg rounded-2xl p-6 md:p-8 border border-white/20 shadow-2xl flex flex-col relative overflow-hidden bg-linear-to-br from-white/70 to-white/30 backdrop-blur-xl">
+            <div className="absolute top-0 left-0 right-0 h-[3px] bg-linear-to-r from-blue-500 via-indigo-500 to-purple-600 opacity-80" />
+
+            <div className="flex justify-between items-start pb-4 border-b border-slate-900/10">
+              <div>
+                <h2 className="text-xl font-black text-slate-900 tracking-tight">Account Profile</h2>
+                <p className="text-xs text-slate-600 font-semibold mt-0.5">Manage details and information parameters</p>
+              </div>
+              <button 
+                type="button"
+                onClick={() => setShowProfileModal(false)} 
+                className="text-slate-500 text-2xl hover:text-slate-900 transition-colors focus:outline-hidden bg-slate-200/40 hover:bg-slate-200/80 rounded-full h-8 w-8 flex items-center justify-center"
+              >
+                &times;
+              </button>
             </div>
-            
-            <form onSubmit={handlePostJobSubmit} className="space-y-4 overflow-y-auto py-4 flex-1 pr-1">
-              <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1">Job Title</label>
-                <input required type="text" className="w-full border border-slate-200 rounded-xl p-3 text-sm focus:outline-hidden focus:border-blue-600 transition bg-slate-50/30" placeholder="e.g. Clean and Organize 3 Bed House" value={formData.title} onChange={(e) => setFormData({...formData, title: e.target.value})} />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1">Budget ($ USD)</label>
-                  <input required type="number" className="w-full border border-slate-200 rounded-xl p-3 text-sm focus:outline-hidden focus:border-blue-600 transition bg-slate-50/30" placeholder="150" value={formData.budget} onChange={(e) => setFormData({...formData, budget: e.target.value})} />
+
+            <form onSubmit={handleProfileUpdateSubmit} className="space-y-5 pt-5">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="sm:col-span-2">
+                  <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-700 mb-1.5 pl-1">Full Name</label>
+                  <input 
+                    required 
+                    type="text" 
+                    className="w-full border border-slate-300/60 rounded-xl p-3 text-sm focus:outline-hidden focus:border-blue-600 focus:ring-2 focus:ring-blue-600/20 transition-all bg-white/50 backdrop-blur-xs placeholder-slate-400 font-medium text-slate-900" 
+                    value={profileForm.name} 
+                    onChange={(e) => setProfileForm({ ...profileForm, name: e.target.value })} 
+                  />
                 </div>
-                <div>
-                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1">Category</label>
-                  <input required type="text" className="w-full border border-slate-200 rounded-xl p-3 text-sm focus:outline-hidden focus:border-blue-600 transition bg-slate-50/30" placeholder="Cleaning, Assembly" value={formData.category} onChange={(e) => setFormData({...formData, category: e.target.value})} />
+
+                <div className="sm:col-span-2">
+                  <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-700 mb-1.5 pl-1">Email Address</label>
+                  <input 
+                    required 
+                    type="text" 
+                    className="w-full border border-slate-300/60 rounded-xl p-3 text-sm focus:outline-hidden focus:border-blue-600 focus:ring-2 focus:ring-blue-600/20 transition-all bg-white/50 backdrop-blur-xs placeholder-slate-400 font-medium text-slate-900" 
+                    value={profileForm.email} 
+                    onChange={(e) => setProfileForm({ ...profileForm, email: e.target.value })} 
+                  />
                 </div>
-              </div>
-              <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1">Location Details</label>
-                <input required type="text" className="w-full border border-slate-200 rounded-xl p-3 text-sm focus:outline-hidden focus:border-blue-600 transition bg-slate-50/30" placeholder="Downtown Bristol, BS1" value={formData.location_text} onChange={(e) => setFormData({...formData, location_text: e.target.value})} />
-              </div>
-              <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1">Scope Description</label>
-                <textarea required rows={4} className="w-full border border-slate-200 rounded-xl p-3 text-sm focus:outline-hidden focus:border-blue-600 resize-none transition bg-slate-50/30" placeholder="Provide breakdown parameters here..." value={formData.description} onChange={(e) => setFormData({...formData, description: e.target.value})} />
+
+                <div>
+                  <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-700 mb-1.5 pl-1">Phone Number</label>
+                  <input 
+                    type="text" 
+                    className="w-full border border-slate-300/60 rounded-xl p-3 text-sm focus:outline-hidden focus:border-blue-600 focus:ring-2 focus:ring-blue-600/20 transition-all bg-white/50 backdrop-blur-xs placeholder-slate-400 font-medium text-slate-900" 
+                    placeholder="+44 7123 456789"
+                    value={profileForm.phone} 
+                    onChange={(e) => setProfileForm({ ...profileForm, phone: e.target.value })} 
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-700 mb-1.5 pl-1">Company / Organization</label>
+                  <input 
+                    type="text" 
+                    className="w-full border border-slate-300/60 rounded-xl p-3 text-sm focus:outline-hidden focus:border-blue-600 focus:ring-2 focus:ring-blue-600/20 transition-all bg-white/50 backdrop-blur-xs placeholder-slate-400 font-medium text-slate-900" 
+                    placeholder="FlyBoy Clothing"
+                    value={profileForm.company} 
+                    onChange={(e) => setProfileForm({ ...profileForm, company: e.target.value })} 
+                  />
+                </div>
               </div>
 
-              <button type="submit" disabled={formSubmitLoading} className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-slate-200 text-white font-bold p-3.5 rounded-xl text-sm transition mt-2 shadow-xs active:scale-99">
-                {formSubmitLoading ? 'Configuring System...' : 'Publish Listing'}
-              </button>
+              <div className="flex gap-3 pt-3 border-t border-slate-900/5 mt-6">
+                <button
+                  type="button"
+                  onClick={() => setShowProfileModal(false)}
+                  className="flex-1 border border-slate-300/80 text-slate-700 font-bold text-xs py-3.5 rounded-xl transition-all bg-white/40 hover:bg-white/80 active:scale-98"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={profileUpdateLoading}
+                  className="flex-1 bg-linear-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 disabled:from-slate-300 disabled:to-slate-400 text-white font-bold text-xs py-3.5 rounded-xl transition-all shadow-md shadow-blue-600/10 hover:shadow-lg hover:shadow-blue-600/20 active:scale-98"
+                >
+                  {profileUpdateLoading ? 'Saving...' : 'Save Updates'}
+                </button>
+              </div>
             </form>
           </div>
         </div>
       )}
 
-      {/* MODAL WINDOW B: APPLICANT SUBMISSIONS EVALUATOR */}
+      {/* --- REVIEW CANDIDATES MODAL VIEW LAYER --- */}
       {focusedJob && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-4">
-          <div className="bg-white max-w-xl w-full rounded-2xl p-6 shadow-xl border border-slate-100 flex flex-col max-h-[85vh]">
-            <div className="flex justify-between items-center pb-4 border-b border-slate-100">
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-md z-50 flex items-center justify-center p-4 transition-all duration-300">
+          <div className="w-full max-w-2xl rounded-2xl p-6 md:p-8 border border-white/20 shadow-2xl flex flex-col relative overflow-hidden bg-linear-to-br from-white/90 to-white/60 backdrop-blur-xl max-h-[85vh]">
+            <div className="absolute top-0 left-0 right-0 h-[3px] bg-linear-to-r from-blue-500 via-indigo-500 to-purple-600 opacity-80" />
+
+            <div className="flex justify-between items-start pb-4 border-b border-slate-900/10">
               <div>
-                <h2 className="text-base font-black text-slate-900 tracking-tight">Applicant Submissions</h2>
-                <p className="text-xs text-slate-400 font-medium mt-0.5">{focusedJob.title}</p>
+                <h2 className="text-xl font-black text-slate-900 tracking-tight">Review Applicants</h2>
+                <p className="text-xs text-slate-600 font-semibold mt-0.5">{focusedJob.title}</p>
               </div>
-              <button onClick={() => setFocusedJob(null)} className="text-slate-400 text-2xl hover:text-slate-600 transition focus:outline-hidden">×</button>
+              <button 
+                type="button:button"
+                onClick={() => setFocusedJob(null)} 
+                className="text-slate-500 text-2xl hover:text-slate-900 transition-colors focus:outline-hidden bg-slate-200/40 hover:bg-slate-200/80 rounded-full h-8 w-8 flex items-center justify-center"
+              >
+                &times;
+              </button>
             </div>
 
-            <div className="overflow-y-auto py-4 space-y-3 flex-1 pr-1">
+            <div className="space-y-3 pt-5 overflow-y-auto pr-1 flex-1">
               {focusedJob.incoming_applications.map((app) => (
-                <div key={app.application_id} className="border border-slate-200/70 p-4 rounded-xl space-y-3 bg-slate-50/50">
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <h4 className="font-bold text-sm text-slate-900">{app.name}</h4>
-                      <p className="text-xs text-amber-600 font-bold mt-0.5">⭐ {app.rating ? `${app.rating.toFixed(1)} Average Rating` : 'New Contractor'}</p>
+                <div key={app.application_id} className="bg-white border border-slate-200 p-4 rounded-xl shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      <span className="font-bold text-slate-900 text-sm">{app.worker_name || 'Anonymous Worker'}</span>
+                      {app.worker_rating && <span className="text-xs font-bold text-amber-500">⭐ {app.worker_rating.toFixed(1)}</span>}
                     </div>
+                    <p className="text-xs text-slate-600 font-medium">"{app.worker_message || 'No submission message provided.'}"</p>
                   </div>
-                  {app.worker_message && (
-                    <p className="text-xs text-slate-500 bg-white p-3 rounded-lg border border-slate-200/40 italic leading-relaxed">
-                      "{app.worker_message}"
-                    </p>
-                  )}
-                  <div className="flex gap-2 pt-1">
-                    <button 
-                      onClick={() => handleApproveCandidate(app.application_id)}
-                      className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs py-2.5 rounded-xl transition shadow-xs active:scale-98"
-                    >
-                      Approve & Appoint
-                    </button>
-                    <button 
+                  <div className="flex gap-2 shrink-0">
+                    <button
+                      type="button"
                       onClick={() => handleDeclineCandidate(app.application_id)}
-                      className="px-4 border border-slate-200 hover:border-red-200 text-slate-500 hover:text-red-600 hover:bg-rose-50/50 font-bold text-xs py-2.5 rounded-xl transition"
+                      className="border border-slate-200 hover:border-red-200 text-slate-600 hover:text-red-600 text-xs font-bold px-3.5 py-2 rounded-xl bg-white transition"
                     >
-                      Decline
+                      Decline Worker
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleApproveCandidate(app.application_id, focusedJob.job_id)}
+                      className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold px-3.5 py-2 rounded-xl transition"
+                    >
+                      Accept Worker
                     </button>
                   </div>
                 </div>
@@ -481,50 +657,49 @@ export default function ClientDashboard() {
         </div>
       )}
 
-      {/* --- NEW: MODAL WINDOW C: CLIENT FEEDBACK LEAVE REVIEW FORM --- */}
+      {/* --- WRITE TRANSACTION REVIEW MODAL --- */}
       {focusedReviewJob && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-4">
-          <div className="bg-white max-w-md w-full rounded-2xl p-6 shadow-xl border border-slate-100 flex flex-col">
-            <div className="flex justify-between items-center pb-4 border-b border-slate-100">
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-md z-50 flex items-center justify-center p-4 transition-all duration-300">
+          <div className="w-full max-w-md rounded-2xl p-6 border border-white/20 shadow-2xl flex flex-col relative overflow-hidden bg-linear-to-br from-white to-slate-50">
+            <div className="absolute top-0 left-0 right-0 h-[3px] bg-emerald-500 opacity-80" />
+
+            <div className="flex justify-between items-start pb-3 border-b border-slate-200">
               <div>
-                <h2 className="text-lg font-black text-slate-900 tracking-tight">Leave a Review</h2>
-                <p className="text-xs text-slate-400 font-medium mt-0.5">For: {focusedReviewJob.title}</p>
+                <h2 className="text-md font-black text-slate-900 tracking-tight">Write Project Review</h2>
+                <p className="text-[11px] text-slate-500 font-semibold mt-0.5">{focusedReviewJob.title}</p>
               </div>
               <button 
-                onClick={() => { setFocusedReviewJob(null); setReviewForm({ rating: 5, comment: '' }); }} 
-                className="text-slate-400 text-2xl hover:text-slate-600 transition focus:outline-hidden"
+                type="button"
+                onClick={() => setFocusedReviewJob(null)} 
+                className="text-slate-400 text-xl hover:text-slate-900 transition-colors focus:outline-hidden"
               >
-                ×
+                &times;
               </button>
             </div>
 
             <form onSubmit={handleReviewSubmit} className="space-y-4 pt-4">
               <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1">Rating</label>
-                <div className="flex items-center gap-2">
-                  {[1, 2, 3, 4, 5].map((num) => (
-                    <button
-                      key={num}
-                      type="button"
-                      onClick={() => setReviewForm({ ...reviewForm, rating: num })}
-                      className={`text-2xl transition-all duration-150 ${
-                        num <= reviewForm.rating ? 'text-amber-400 scale-110' : 'text-slate-200 hover:text-slate-300'
-                      }`}
-                    >
-                      ★
-                    </button>
-                  ))}
-                  <span className="text-sm font-bold text-slate-600 ml-2">{reviewForm.rating}.0 / 5.0</span>
-                </div>
+                <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1 pl-0.5">Rating Evaluation</label>
+                <select 
+                  className="w-full border border-slate-200 rounded-xl p-2.5 text-sm bg-white font-medium text-slate-800 focus:outline-hidden"
+                  value={reviewForm.rating}
+                  onChange={(e) => setReviewForm({ ...reviewForm, rating: Number(e.target.value) })}
+                >
+                  <option value="5">⭐⭐⭐⭐⭐ Excellent (5/5)</option>
+                  <option value="4">⭐⭐⭐⭐ Great Execution (4/5)</option>
+                  <option value="3">⭐⭐⭐ Satisfactory Work (3/5)</option>
+                  <option value="2">⭐⭐ Underperforming (2/5)</option>
+                  <option value="1">⭐ Unacceptable (1/5)</option>
+                </select>
               </div>
 
               <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1">Review Comments</label>
-                <textarea
+                <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1 pl-0.5">Written Evaluation Summary</label>
+                <textarea 
                   required
-                  rows={4}
-                  className="w-full border border-slate-200 rounded-xl p-3 text-sm focus:outline-hidden focus:border-blue-600 resize-none transition bg-slate-50/30"
-                  placeholder="Share your experience working with this service worker..."
+                  rows="3"
+                  placeholder="Summarize performance milestones, speed, communication attributes..."
+                  className="w-full border border-slate-200 rounded-xl p-3 text-xs bg-white font-medium text-slate-900 focus:outline-hidden focus:ring-2 focus:ring-blue-600/20 focus:border-blue-600 transition-all placeholder-slate-400"
                   value={reviewForm.comment}
                   onChange={(e) => setReviewForm({ ...reviewForm, comment: e.target.value })}
                 />
@@ -533,24 +708,23 @@ export default function ClientDashboard() {
               <div className="flex gap-2 pt-2">
                 <button
                   type="button"
-                  onClick={() => { setFocusedReviewJob(null); setReviewForm({ rating: 5, comment: '' }); }}
-                  className="flex-1 border border-slate-200 text-slate-500 font-bold text-xs py-3 rounded-xl transition hover:bg-slate-50"
+                  onClick={() => setFocusedReviewJob(null)}
+                  className="flex-1 border border-slate-200 text-slate-600 font-bold text-xs py-3 rounded-xl transition bg-white"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={reviewSubmitLoading}
-                  className="flex-1 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-200 text-white font-bold text-xs py-3 rounded-xl transition shadow-xs active:scale-98"
+                  className="flex-1 bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-300 text-white font-bold text-xs py-3 rounded-xl transition shadow-xs"
                 >
-                  {reviewSubmitLoading ? 'Submitting...' : 'Submit Evaluation'}
+                  {reviewSubmitLoading ? 'Submitting...' : 'Submit Review'}
                 </button>
               </div>
             </form>
           </div>
         </div>
       )}
-
     </div>
   );
 }

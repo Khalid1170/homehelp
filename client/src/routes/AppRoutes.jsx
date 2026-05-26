@@ -5,10 +5,11 @@ import { useAuth } from '../context/AuthContext';
 // 🔓 Public Page Imports
 import Home from '../pages/public/Home';
 import Login from '../pages/auth/Login';
-import Register from '../pages/auth/Register';
+import ClientRegister from '../pages/auth/ClientRegister'; // 👈 Specialized Client Registration
+import WorkerRegister from '../pages/auth/WorkerRegister'; // 👈 Specialized Worker Registration
 import BrowseJobs from '../pages/public/BrowseJobs';
 import JobFullDetails from '../pages/public/JobFullDetails';
-import WorkersDirectory from '../pages/public/WorkersDirectory'; // 👈 ADDED: Public network directory
+import WorkersDirectory from '../pages/public/WorkersDirectory'; 
 
 // 💼 Client Page Imports
 import ClientDashboard from '../pages/client/ClientDashboard';
@@ -16,8 +17,9 @@ import CreateJob from '../pages/client/CreateJob';
 
 // 🛠️ Worker Page Imports
 import WorkerDashboard from '../pages/worker/WorkerDashboard';
+import WorkerProfile from '../pages/worker/WorkerProfile'; // 👈 NEW: Profile View & Edit Page Component
 import JobPitchForm from '../pages/worker/JobPitchForm';
-import StripeCallback from '../pages/worker/StripeCallback'; // Onboarding Handshake Landings for Express Connect Accounts
+import StripeCallback from '../pages/worker/StripeCallback'; 
 
 // 📊 Admin Page Imports
 import AdminDashboard from '../pages/admin/AdminDashboard';
@@ -47,10 +49,17 @@ export default function AppRoutes() {
       {/* Public Routes */}
       <Route path="/" element={<Home />} />
       <Route path="/login" element={<Login />} />
-      <Route path="/register" element={<Register />} />
+      
+      {/* 💥 Split Registration Pathing */}
+      <Route path="/register/client" element={<ClientRegister />} />
+      <Route path="/register/worker" element={<WorkerRegister />} />
+      
+      {/* Catch-all legacy registration redirect to prevent broken links */}
+      <Route path="/register" element={<Navigate to="/register/client" replace />} />
+      
       <Route path="/browse-jobs" element={<BrowseJobs />} />
       
-      {/* 🌐 NEW: Publicly Accessible Worker Registry Directory */}
+      {/* 🌐 Publicly Accessible Worker Registry Directory */}
       <Route path="/workers" element={<WorkersDirectory />} />
       
       {/* 👁️ Publicly Accessible Job Details Profile View */}
@@ -72,6 +81,13 @@ export default function AppRoutes() {
       <Route path="/worker/dashboard" element={
         <ProtectedRoute allowedRoles={['worker']}>
           <WorkerDashboard />
+        </ProtectedRoute>
+      } />
+      
+      {/* 👤 NEW: Restricted Worker Settings Profile Route */}
+      <Route path="/profile" element={
+        <ProtectedRoute allowedRoles={['worker']}>
+          <WorkerProfile />
         </ProtectedRoute>
       } />
       
