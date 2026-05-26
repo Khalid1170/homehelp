@@ -388,6 +388,9 @@ export default function WorkersJobCard({
                 </div>
               )}
               {/* 🟢 NEW: Render the Chat Modal when state is true */}
+
+            </div>
+          </div>
       {isChatModalOpen && (
 //         <JobChatModal
 //   jobId={job.job_id || job.id}
@@ -402,9 +405,6 @@ export default function WorkersJobCard({
   onClose={() => setIsChatModalOpen(false)}
 />
       )}
-            </div>
-          </div>
-
         </div>
       </div>
     </div>

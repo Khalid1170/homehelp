@@ -4,6 +4,7 @@ import Navbar from '../../components/Navbar';
 import Footer from '../../components/Footer'; 
 import JobChatModal from '../../components/JobChatModal';
 import { useNavigate } from 'react-router-dom';
+import { MessageSquare } from 'lucide-react';
 
 export default function ClientDashboard() {
   const navigate = useNavigate();
@@ -176,6 +177,7 @@ export default function ClientDashboard() {
     <div className="min-h-screen bg-slate-50/60 flex flex-col">
       <Navbar setShowGetStarted={() => navigate('/create-job')} />
       
+{/* --- CLIENT DASHBOARD SUB-HEADER BANNER --- */}
       <div className="bg-white border-b border-slate-200/80 sticky top-[65px] z-30 py-6">
         <div className="max-w-6xl mx-auto px-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
@@ -191,7 +193,20 @@ export default function ClientDashboard() {
             </p>
           </div>
           
-          <div className="flex items-center gap-2 self-start sm:self-center relative z-50">
+          <div className="flex flex-wrap items-center gap-2 self-start sm:self-center relative z-50">
+            {/* --- INBOX BUTTON INTEGRATION --- */}
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                navigate('/chats');
+              }}
+              className="bg-white hover:bg-slate-50 text-slate-800 border border-slate-200 font-bold text-sm px-4 py-3 rounded-xl flex items-center gap-2 transition duration-200 shadow-xs active:scale-98 cursor-pointer"
+            >
+              <MessageSquare className="w-4 h-4 text-blue-500" />
+              <span>Open Live Inbox</span>
+            </button>
+
             <button
               type="button"
               onClick={(e) => {
@@ -216,7 +231,6 @@ export default function ClientDashboard() {
           </div>
         </div>
       </div>
-
       <div className="max-w-6xl mx-auto w-full px-4 mt-8 flex-1 pb-16">
         {/* Core Metrics Grid */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
@@ -462,39 +476,42 @@ export default function ClientDashboard() {
                         </div>
                       </div>
 
-                      <div className="space-y-1.5">
-                        <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400">Client Platform Feedback Review</h4>
-                        <div className="bg-white border border-slate-200/60 rounded-xl p-4">
-                          {job.review ? (
-                            <div className="space-y-2">
-                              <div className="flex items-center gap-1">
-                                {[...Array(5)].map((_, idx) => (
-                                  <span key={idx} className={`text-sm ${idx < job.review.rating ? 'text-amber-400' : 'text-slate-200'}`}>★</span>
-                                ))}
-                                <span className="text-xs font-bold text-slate-700 ml-1">({job.review.rating}.0 / 5.0)</span>
-                              </div>
-                              <p className="text-xs text-slate-500 italic leading-relaxed">"{job.review.comment || 'No written summary parameters provided.'}"</p>
-                            </div>
-                          ) : (
-                            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                              <p className="text-xs font-semibold text-slate-400 italic">
-                                {job.status === 'completed' 
-                                  ? 'No evaluation feedback loop submitted for this position listing.' 
-                                  : 'Feedback loops unlock once milestones achieve full closure.'}
-                              </p>
-                              {job.status === 'completed' && (
-                                <button
-                                  type="button"
-                                  onClick={(e) => { e.stopPropagation(); setFocusedReviewJob(job); }}
-                                  className="bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs px-3 py-2 rounded-xl transition duration-150"
-                                >
-                                  Write Review ⭐
-                                </button>
-                              )}
-                            </div>
-                          )}
-                        </div>
-                      </div>
+<div className="space-y-1.5">
+  <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400">Client Platform Feedback Review</h4>
+  <div className="bg-white border border-slate-200/60 rounded-xl p-4">
+    {job.review ? (
+      <div className="space-y-2">
+        <div className="flex items-center gap-1">
+          {[...Array(5)].map((_, idx) => (
+            <span key={idx} className={`text-sm ${idx < job.review.rating ? 'text-amber-400' : 'text-slate-200'}`}>★</span>
+          ))}
+          <span className="text-xs font-bold text-slate-700 ml-1">({job.review.rating}.0 / 5.0)</span>
+        </div>
+        <p className="text-xs text-slate-500 italic leading-relaxed">"{job.review.comment || 'No written summary parameters provided.'}"</p>
+      </div>
+    ) : (
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <p className="text-xs font-semibold text-slate-400 italic">
+          {/* 🟢 Added .toLowerCase() to eliminate casing discrepancies */}
+          {job.status?.toLowerCase() === 'completed' 
+            ? 'No evaluation feedback loop submitted for this position listing.' 
+            : 'Feedback loops unlock once milestones achieve full closure.'}
+        </p>
+        
+        {/* 🟢 Added .toLowerCase() here as well */}
+        {job.status?.toLowerCase() === 'completed' && (
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); setFocusedReviewJob(job); }}
+            className="bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs px-3 py-2 rounded-xl transition duration-150"
+          >
+            Write Review ⭐
+          </button>
+        )}
+      </div>
+    )}
+  </div>
+</div>
                     </div>
                   )}
                 </div>

@@ -10,7 +10,6 @@ import {
   X, 
   AlertCircle,
   FileText,
-  Users,
   ArrowRight
 } from 'lucide-react';
 
@@ -85,9 +84,8 @@ export default function WorkersDirectory() {
             </p>
           </div>
           
-          {/* Action Row: Search & Low-Key Subtle Shortcuts */}
+          {/* Action Row: Search & Shortcuts */}
           <div className="flex flex-col sm:flex-row items-center gap-4 w-full md:w-auto justify-end">
-            {/* Subtle Text Links hidden on small mobile, clean on desktop */}
             <div className="hidden sm:flex items-center gap-4 text-xs font-bold text-slate-400 mr-2">
               <a href="/register?role=client" className="hover:text-slate-600 transition">Post a Job</a>
               <span className="text-slate-200">|</span>
@@ -114,7 +112,7 @@ export default function WorkersDirectory() {
       {/* Main Grid View Controller */}
       <main className="max-w-6xl mx-auto px-4 sm:px-6 mt-8">
         
-        {/* State A: Loading View Spinner */}
+        {/* Loading View Spinner */}
         {isLoading && (
           <div className="text-center py-32 flex flex-col items-center justify-center gap-4">
             <div className="relative w-8 h-8 flex items-center justify-center">
@@ -125,9 +123,9 @@ export default function WorkersDirectory() {
           </div>
         )}
 
-        {/* State B: Error View Callout */}
+        {/* Error View Callout */}
         {!isLoading && error && (
-          <div className="text-center py-16 bg-white border border-rose-100 rounded-3xl p-8 max-w-xl mx-auto shadow-xl shadow-rose-600/5 animate-[scaleUp_0.2s_ease-out]">
+          <div className="text-center py-16 bg-white border border-rose-100 rounded-3xl p-8 max-w-xl mx-auto shadow-xl shadow-rose-600/5">
             <div className="w-12 h-12 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center mx-auto mb-4 border border-rose-100">
               <AlertCircle className="w-5 h-5" />
             </div>
@@ -135,7 +133,7 @@ export default function WorkersDirectory() {
           </div>
         )}
 
-        {/* State C: Loaded Data Layout */}
+        {/* Loaded Data Layout */}
         {!isLoading && !error && (
           filteredWorkers.length === 0 ? (
             <div className="text-center py-16 bg-white border border-dashed border-slate-200 rounded-3xl p-8 max-w-2xl mx-auto shadow-xs space-y-5">
@@ -152,7 +150,7 @@ export default function WorkersDirectory() {
               </div>
             </div>
           ) : (
-            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6 animate-[fadeIn_0.2s_ease-out]">
+            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
               {filteredWorkers.map((worker, index) => {
                 const renderElements = [
                   <div key={worker.worker_id || worker.id} className="transition-all duration-300 hover:-translate-y-0.5">
@@ -163,10 +161,9 @@ export default function WorkersDirectory() {
                   </div>
                 ];
 
-                {/* 🥷 PASSIVE INLINE CTA: Inject a subtle prompt structural card at position index 1 */}
                 if (index === 1 && searchQuery === '') {
                   renderElements.push(
-                    <div key="inline-cta-card" className="border border-dashed border-slate-300 rounded-2xl p-6 bg-linear-to-b from-slate-50 to-white flex flex-col justify-between min-h-[280px]">
+                    <div key="inline-cta-card" className="border border-dashed border-slate-300 rounded-2xl p-6 bg-gradient-to-b from-slate-50 to-white flex flex-col justify-between min-h-[280px]">
                       <div className="space-y-2.5">
                         <span className="inline-block text-[9px] font-black tracking-wider text-indigo-600 uppercase bg-indigo-50 border border-indigo-100 px-2 py-0.5 rounded-md">
                           Platform Notice
@@ -204,10 +201,10 @@ export default function WorkersDirectory() {
 
       {/* 🧾 Profile Centered Modal Section */}
       {activeWorker && (
-        <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/40 backdrop-blur-md flex items-center justify-center p-4 animate-[fadeIn_0.15s_ease-out]">
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/40 backdrop-blur-md flex items-center justify-center p-4">
           <div className="absolute inset-0" onClick={() => setSelectedWorkerId(null)} />
 
-          <div className="relative w-full max-w-xl bg-white rounded-3xl shadow-2xl flex flex-col z-10 max-h-[90vh] overflow-hidden border border-slate-100 animate-[scaleUp_0.2s_ease-out]">
+          <div className="relative w-full max-w-xl bg-white rounded-3xl shadow-2xl flex flex-col z-10 max-h-[90vh] overflow-hidden border border-slate-100">
             <div className="border-b border-slate-100 p-6 flex justify-between items-center bg-slate-50/50">
               <div>
                 <h2 className="text-xl font-black text-slate-900 tracking-tight">{activeWorker.name}</h2>
@@ -253,7 +250,7 @@ export default function WorkersDirectory() {
                 <div className="grid grid-cols-2 gap-4">
                   <div className="border border-slate-100 p-4 rounded-2xl text-center shadow-xs bg-slate-50/30">
                     <span className="text-xl font-black text-slate-900 flex items-center justify-center gap-1">
-                      {activeWorker.rating ? activeWorker.rating.toFixed(1) : '0.0'} 
+                      {activeWorker.rating ? Number(activeWorker.rating).toFixed(1) : '0.0'} 
                       <Star className="w-4 h-4 text-amber-500 fill-amber-500" />
                     </span>
                     <span className="text-[10px] text-slate-400 font-black uppercase tracking-widest block mt-1">Rating</span>
@@ -267,6 +264,7 @@ export default function WorkersDirectory() {
                 </div>
               </div>
 
+              {/* 🟢 WHAT NEIGHBORS SAY GRID ENTRY SECTION */}
               <div className="pt-5 space-y-4">
                 <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
                   <Calendar className="w-3.5 h-3.5 text-slate-400" />
@@ -277,28 +275,43 @@ export default function WorkersDirectory() {
                   <p className="text-xs font-bold text-slate-400 italic py-2 pl-1">No feedback entries left yet.</p>
                 ) : (
                   <div className="space-y-3.5 max-h-60 overflow-y-auto pr-1">
-                    {activeWorker.past_jobs.map((job, idx) => (
-                      <div key={job.id || idx} className="border border-slate-200/60 bg-white rounded-2xl p-4 space-y-2 shadow-xs">
-                        <div className="flex justify-between items-start gap-3">
-                          <div>
-                            <h4 className="text-xs font-black text-slate-900 tracking-tight leading-snug">{job.title || 'General Help'}</h4>
-                            <p className="text-[10px] text-slate-400 font-semibold tracking-tight mt-0.5">
-                              {job.date ? `Finished: ${job.date}` : 'Completed'} {job.client ? ` • By: ${job.client}` : ''}
-                            </p>
+                    {activeWorker.past_jobs.map((job, idx) => {
+                      // 1. Structural extraction for nested objects or standard properties
+                      const ratingValue = job.rating ?? job.review?.rating;
+                      
+                      // 2. Comprehensive Sweep: Catches strings, nested comments, text, or feedback attributes
+                      const reviewComment = job.review 
+                        ? (typeof job.review === 'object' ? (job.review.comment || job.review.text) : job.review)
+                        : (job.comment || job.feedback);
+
+                      return (
+                        <div key={job.id || idx} className="border border-slate-200/60 bg-white rounded-2xl p-4 space-y-2 shadow-xs">
+                          <div className="flex justify-between items-start gap-3">
+                            <div>
+                              <h4 className="text-xs font-black text-slate-900 tracking-tight leading-snug">
+                                {job.title || 'General Help'}
+                              </h4>
+                              <p className="text-[10px] text-slate-400 font-semibold tracking-tight mt-0.5">
+                                {job.date ? `Finished: ${job.date}` : 'Completed'} {job.client ? ` • By: ${job.client}` : ''}
+                              </p>
+                            </div>
+                            
+                            {ratingValue !== undefined && ratingValue !== null && (
+                              <span className="text-[10px] font-black bg-amber-50/60 text-amber-700 px-2 py-0.5 rounded-lg border border-amber-200/50 flex items-center gap-0.5 shrink-0 select-none">
+                                <Star className="w-3 h-3 fill-amber-500 text-amber-500" /> 
+                                {Number(ratingValue).toFixed(1)}
+                              </span>
+                            )}
                           </div>
-                          {job.rating && (
-                            <span className="text-[10px] font-black bg-amber-50/60 text-amber-700 px-2 py-0.5 rounded-lg border border-amber-200/50 flex items-center gap-0.5 shrink-0 select-none">
-                              <Star className="w-3 h-3 fill-amber-500 text-amber-500" /> {Number(job.rating).toFixed(1)}
-                            </span>
+
+                          {reviewComment && (
+                            <p className="text-xs text-slate-500 italic leading-relaxed font-medium bg-slate-50 p-3 rounded-xl border border-slate-100/50">
+                              "{reviewComment}"
+                            </p>
                           )}
                         </div>
-                        {job.review && (
-                          <p className="text-xs text-slate-500 italic leading-relaxed font-medium bg-slate-50 p-3 rounded-xl border border-slate-100/50">
-                            "{job.review}"
-                          </p>
-                        )}
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 )}
               </div>
