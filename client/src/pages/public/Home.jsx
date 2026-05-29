@@ -65,7 +65,7 @@ export default function Home() {
               {isClient ? (
                 <>
                   <button
-                    onClick={() => navigate('/client/post-job')}
+                    onClick={() => navigate('/client/create-job')}
                     className="bg-slate-900 text-white font-bold text-sm px-8 py-4 rounded-xl hover:bg-slate-800 transition-all duration-200 shadow-md active:scale-98 flex items-center gap-2"
                   >
                     <PlusCircle className="w-4 h-4" /> Post a New Task

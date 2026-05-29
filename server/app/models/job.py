@@ -45,6 +45,7 @@ class Job(db.Model):
     # FIX 1: Point to 'JobApplication' instead of 'Application'
     # Keeping the name 'incoming_applications' so your code reads cleanly
     incoming_applications = db.relationship('JobApplication', backref='associated_job', lazy=True)
+    review = db.relationship("Review", backref="job", uselist=False)
 
 
 class JobApplication(db.Model):

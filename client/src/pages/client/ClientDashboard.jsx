@@ -178,7 +178,7 @@ export default function ClientDashboard() {
       <Navbar setShowGetStarted={() => navigate('/create-job')} />
       
 {/* --- CLIENT DASHBOARD SUB-HEADER BANNER --- */}
-      <div className="bg-white border-b border-slate-200/80 sticky top-[65px] z-30 py-6">
+      <div className="bg-white border-b border-slate-200/80 top-[65px] z-30 py-6">
         <div className="max-w-6xl mx-auto px-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
             <h1 className="text-2xl font-black text-slate-900 tracking-tight">Control Dashboard</h1>
@@ -285,7 +285,7 @@ export default function ClientDashboard() {
               {activeTab === 'active' && (
                 <button
                   type="button"
-                  onClick={() => navigate('/create-job')}
+                  onClick={() => navigate('/client/create-job')}
                   className="mt-6 inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-bold text-sm px-6 py-3.5 rounded-xl transition shadow-md shadow-blue-600/10 hover:shadow-lg hover:shadow-blue-600/20 active:scale-98"
                 >
                   Post Your First Job Listing +
@@ -475,35 +475,54 @@ export default function ClientDashboard() {
                           </div>
                         </div>
                       </div>
-
 <div className="space-y-1.5">
-  <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400">Client Platform Feedback Review</h4>
+  <h4 className="text-xs font-black uppercase tracking-wider text-slate-400">Client Platform Feedback Review</h4>
   <div className="bg-white border border-slate-200/60 rounded-xl p-4">
-    {job.review ? (
-      <div className="space-y-2">
-        <div className="flex items-center gap-1">
-          {[...Array(5)].map((_, idx) => (
-            <span key={idx} className={`text-sm ${idx < job.review.rating ? 'text-amber-400' : 'text-slate-200'}`}>★</span>
-          ))}
-          <span className="text-xs font-bold text-slate-700 ml-1">({job.review.rating}.0 / 5.0)</span>
-        </div>
-        <p className="text-xs text-slate-500 italic leading-relaxed">"{job.review.comment || 'No written summary parameters provided.'}"</p>
-      </div>
+    {/* 🟢 Refined Check: Checks if job.review exists as an object OR a raw flat string */}
+    {job.review || job.comment || job.feedback ? (
+      (() => {
+        // 1. Safely extract rating score whether flat, nested, or fallback to full 5 stars
+        const numericalRating = job.rating ?? job.review?.rating ?? 5;
+        
+        // 2. Safely extract textual review string regardless of database column scheme
+        const textComment = job.review && typeof job.review === 'object'
+          ? (job.review.comment || job.review.text)
+          : (job.review || job.comment || job.feedback);
+
+        return (
+          <div className="space-y-2">
+            <div className="flex items-center gap-1">
+              {[...Array(5)].map((_, idx) => (
+                <span 
+                  key={idx} 
+                  className={`text-sm select-none ${idx < numericalRating ? 'text-amber-400' : 'text-slate-200'}`}
+                >
+                  ★
+                </span>
+              ))}
+              <span className="text-xs font-bold text-slate-700 ml-1">
+                ({Number(numericalRating).toFixed(1)} / 5.0)
+              </span>
+            </div>
+            <p className="text-xs text-slate-500 italic leading-relaxed">
+              "{textComment || 'No written summary parameters provided.'}"
+            </p>
+          </div>
+        );
+      })()
     ) : (
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <p className="text-xs font-semibold text-slate-400 italic">
-          {/* 🟢 Added .toLowerCase() to eliminate casing discrepancies */}
           {job.status?.toLowerCase() === 'completed' 
             ? 'No evaluation feedback loop submitted for this position listing.' 
             : 'Feedback loops unlock once milestones achieve full closure.'}
         </p>
         
-        {/* 🟢 Added .toLowerCase() here as well */}
         {job.status?.toLowerCase() === 'completed' && (
           <button
             type="button"
             onClick={(e) => { e.stopPropagation(); setFocusedReviewJob(job); }}
-            className="bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs px-3 py-2 rounded-xl transition duration-150"
+            className="bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs px-3 py-2 rounded-xl transition duration-150 cursor-pointer"
           >
             Write Review ⭐
           </button>
