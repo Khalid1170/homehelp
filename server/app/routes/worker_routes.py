@@ -1,6 +1,8 @@
 from flask import Blueprint, jsonify, request
 from app.extensions import db
 from app.models import Worker, User, Job, JobApplication 
+# 🟢 1. Import your Review model
+from app.models import Review 
 from flask_jwt_extended import jwt_required, get_jwt_identity
 
 workers_bp = Blueprint('workers_bp', __name__)
@@ -14,7 +16,7 @@ def get_public_workers_directory():
 
         for worker in active_workers:
             user_record = worker.user
-            if not user_record or user_record.is_suspended:
+            if not user_record or getattr(user_record, 'is_suspended', False):
                 continue
 
             completed_jobs = Job.query.filter_by(
@@ -24,13 +26,26 @@ def get_public_workers_directory():
 
             past_jobs_history = []
             for job in completed_jobs:
+                # 🟢 2. Fetch the corresponding review record from the database
+                review_record = Review.query.filter_by(job_id=job.id).first()
+
+                # 🟢 3. Build a structured payload that matches your client/worker dashboards
+                review_payload = None
+                if review_record:
+                    review_payload = {
+                        "comment": review_record.comment,
+                        "rating": review_record.rating
+                    }
+
                 past_jobs_history.append({
                     "id": job.id,
                     "title": job.title,
                     "date": job.created_at.strftime('%B %Y') if job.created_at else "Recently",
-                    "client": job.client.full_name if job.client else "Verified Client",
-                    "rating": worker.average_rating if worker.average_rating > 0 else 5.0,
-                    "review": "Successfully completed project within marketplace guidelines."
+                    "client": job.client.full_name if (getattr(job, 'client', None) and job.client.full_name) else "Verified Client",
+                    # Track individual job rating if review exists, otherwise drop back to average
+                    "rating": review_record.rating if review_record else (worker.average_rating if worker.average_rating > 0 else 5.0),
+                    # 🟢 4. Inject the structured object or leave it as None so front-end conditions route cleanly
+                    "review": review_payload 
                 })
 
             skills_array = []
@@ -39,6 +54,7 @@ def get_public_workers_directory():
 
             public_directory_payload.append({
                 "worker_id": worker.id,
+                "id": worker.id, # Fallback ID key matching React state array `.find()` lookups
                 "name": user_record.full_name,
                 "rating": round(worker.average_rating, 1) if worker.average_rating else 0.0,
                 "completed_jobs": worker.total_jobs_completed or len(completed_jobs),
@@ -51,8 +67,9 @@ def get_public_workers_directory():
         return jsonify(public_directory_payload), 200
 
     except Exception as e:
-        print(f"❌ [BACKEND DIRECTORY ERROR]: {str-e}")
-        return jsonify({"error": "Failed to compile worker registry"}), 500
+        # 🟢 FIX: Resolved syntax error string hyphen (`str-e` changed to `str(e)`)
+        print(f"❌ [BACKEND DIRECTORY ERROR]: {str(e)}")
+        return jsonify({"error": "Failed to compile worker registry", "details": str(e)}), 500
     
 
 @workers_bp.route('/api/worker/profile', methods=['GET'])
@@ -65,12 +82,11 @@ def get_current_worker_profile():
         if not worker:
             return jsonify({"message": "Worker profile record not found."}), 404
 
-        user_record = worker.user # 👈 Fetching parent user record
+        user_record = worker.user 
 
         profile_payload = {
             "name": user_record.full_name if user_record else "Task Professional",
             "email": user_record.email if user_record else "",
-            # 🖥️ Reads from User model fallback safely if it exists, otherwise empty string
             "phone_number": getattr(user_record, 'phone_number', '') or getattr(user_record, 'phone', '') or "",
             "location_text": worker.location_text or "",
             "skills": worker.skills or "", 
@@ -107,14 +123,12 @@ def update_worker_profile():
         if not phone_number or not bio or not skills:
             return jsonify({"message": "Phone number, tasks, and bio are mandatory fields."}), 400
 
-        # 🔄 Safely assign phone back to whichever attribute name exists on User model
         if user_record:
             if hasattr(user_record, 'phone_number'):
                 user_record.phone_number = phone_number
             elif hasattr(user_record, 'phone'):
                 user_record.phone = phone_number
 
-        # Apply updates to worker database columns
         worker.location_text = location_text
         worker.skills = skills
         worker.bio = bio

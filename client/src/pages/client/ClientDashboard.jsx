@@ -552,146 +552,88 @@ export default function ClientDashboard() {
         />
       )}
 
-      {/* --- RESPONSIVE GLASSMORPHISM ACCOUNT PROFILE EDITOR --- */}
-      {showProfileModal && (
-        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-md z-50 flex items-center justify-center p-4 transition-all duration-300">
-          <div className="w-full max-w-lg rounded-2xl p-6 md:p-8 border border-white/20 shadow-2xl flex flex-col relative overflow-hidden bg-linear-to-br from-white/70 to-white/30 backdrop-blur-xl">
-            <div className="absolute top-0 left-0 right-0 h-[3px] bg-linear-to-r from-blue-500 via-indigo-500 to-purple-600 opacity-80" />
+   {/* --- RESPONSIVE GLASSMORPHISM ACCOUNT PROFILE EDITOR --- */}
+{showProfileModal && (
+  <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-md z-50 flex items-center justify-center p-4 transition-all duration-300">
+    <div className="w-full max-w-lg rounded-2xl p-6 md:p-8 border border-white/20 shadow-2xl flex flex-col relative overflow-hidden bg-linear-to-br from-white/70 to-white/30 backdrop-blur-xl">
+      <div className="absolute top-0 left-0 right-0 h-[3px] bg-linear-to-r from-blue-500 via-indigo-500 to-purple-600 opacity-80" />
 
-            <div className="flex justify-between items-start pb-4 border-b border-slate-900/10">
-              <div>
-                <h2 className="text-xl font-black text-slate-900 tracking-tight">Account Profile</h2>
-                <p className="text-xs text-slate-600 font-semibold mt-0.5">Manage details and information parameters</p>
-              </div>
-              <button 
-                type="button"
-                onClick={() => setShowProfileModal(false)} 
-                className="text-slate-500 text-2xl hover:text-slate-900 transition-colors focus:outline-hidden bg-slate-200/40 hover:bg-slate-200/80 rounded-full h-8 w-8 flex items-center justify-center"
-              >
-                &times;
-              </button>
-            </div>
-
-            <form onSubmit={handleProfileUpdateSubmit} className="space-y-5 pt-5">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="sm:col-span-2">
-                  <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-700 mb-1.5 pl-1">Full Name</label>
-                  <input 
-                    required 
-                    type="text" 
-                    className="w-full border border-slate-300/60 rounded-xl p-3 text-sm focus:outline-hidden focus:border-blue-600 focus:ring-2 focus:ring-blue-600/20 transition-all bg-white/50 backdrop-blur-xs placeholder-slate-400 font-medium text-slate-900" 
-                    value={profileForm.name} 
-                    onChange={(e) => setProfileForm({ ...profileForm, name: e.target.value })} 
-                  />
-                </div>
-
-                <div className="sm:col-span-2">
-                  <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-700 mb-1.5 pl-1">Email Address</label>
-                  <input 
-                    required 
-                    type="text" 
-                    className="w-full border border-slate-300/60 rounded-xl p-3 text-sm focus:outline-hidden focus:border-blue-600 focus:ring-2 focus:ring-blue-600/20 transition-all bg-white/50 backdrop-blur-xs placeholder-slate-400 font-medium text-slate-900" 
-                    value={profileForm.email} 
-                    onChange={(e) => setProfileForm({ ...profileForm, email: e.target.value })} 
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-700 mb-1.5 pl-1">Phone Number</label>
-                  <input 
-                    type="text" 
-                    className="w-full border border-slate-300/60 rounded-xl p-3 text-sm focus:outline-hidden focus:border-blue-600 focus:ring-2 focus:ring-blue-600/20 transition-all bg-white/50 backdrop-blur-xs placeholder-slate-400 font-medium text-slate-900" 
-                    placeholder="+44 7123 456789"
-                    value={profileForm.phone} 
-                    onChange={(e) => setProfileForm({ ...profileForm, phone: e.target.value })} 
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-700 mb-1.5 pl-1">Company / Organization</label>
-                  <input 
-                    type="text" 
-                    className="w-full border border-slate-300/60 rounded-xl p-3 text-sm focus:outline-hidden focus:border-blue-600 focus:ring-2 focus:ring-blue-600/20 transition-all bg-white/50 backdrop-blur-xs placeholder-slate-400 font-medium text-slate-900" 
-                    placeholder="FlyBoy Clothing"
-                    value={profileForm.company} 
-                    onChange={(e) => setProfileForm({ ...profileForm, company: e.target.value })} 
-                  />
-                </div>
-              </div>
-
-              <div className="flex gap-3 pt-3 border-t border-slate-900/5 mt-6">
-                <button
-                  type="button"
-                  onClick={() => setShowProfileModal(false)}
-                  className="flex-1 border border-slate-300/80 text-slate-700 font-bold text-xs py-3.5 rounded-xl transition-all bg-white/40 hover:bg-white/80 active:scale-98"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={profileUpdateLoading}
-                  className="flex-1 bg-linear-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 disabled:from-slate-300 disabled:to-slate-400 text-white font-bold text-xs py-3.5 rounded-xl transition-all shadow-md shadow-blue-600/10 hover:shadow-lg hover:shadow-blue-600/20 active:scale-98"
-                >
-                  {profileUpdateLoading ? 'Saving...' : 'Save Updates'}
-                </button>
-              </div>
-            </form>
-          </div>
+      <div className="flex justify-between items-start pb-4 border-b border-slate-900/10">
+        <div>
+          <h2 className="text-xl font-black text-slate-900 tracking-tight">Account Profile</h2>
+          <p className="text-xs text-slate-600 font-semibold mt-0.5">Manage details and information parameters</p>
         </div>
-      )}
+        <button 
+          type="button"
+          onClick={() => setShowProfileModal(false)} 
+          className="text-slate-500 text-2xl hover:text-slate-900 transition-colors focus:outline-hidden bg-slate-200/40 hover:bg-slate-200/80 rounded-full h-8 w-8 flex items-center justify-center"
+        >
+          &times;
+        </button>
+      </div>
 
-      {/* --- REVIEW CANDIDATES MODAL VIEW LAYER --- */}
-      {focusedJob && (
-        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-md z-50 flex items-center justify-center p-4 transition-all duration-300">
-          <div className="w-full max-w-2xl rounded-2xl p-6 md:p-8 border border-white/20 shadow-2xl flex flex-col relative overflow-hidden bg-linear-to-br from-white/90 to-white/60 backdrop-blur-xl max-h-[85vh]">
-            <div className="absolute top-0 left-0 right-0 h-[3px] bg-linear-to-r from-blue-500 via-indigo-500 to-purple-600 opacity-80" />
-
-            <div className="flex justify-between items-start pb-4 border-b border-slate-900/10">
-              <div>
-                <h2 className="text-xl font-black text-slate-900 tracking-tight">Review Applicants</h2>
-                <p className="text-xs text-slate-600 font-semibold mt-0.5">{focusedJob.title}</p>
-              </div>
-              <button 
-                type="button:button"
-                onClick={() => setFocusedJob(null)} 
-                className="text-slate-500 text-2xl hover:text-slate-900 transition-colors focus:outline-hidden bg-slate-200/40 hover:bg-slate-200/80 rounded-full h-8 w-8 flex items-center justify-center"
-              >
-                &times;
-              </button>
-            </div>
-
-            <div className="space-y-3 pt-5 overflow-y-auto pr-1 flex-1">
-              {focusedJob.incoming_applications.map((app) => (
-                <div key={app.application_id} className="bg-white border border-slate-200 p-4 rounded-xl shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-2">
-                      <span className="font-bold text-slate-900 text-sm">{app.worker_name || 'Anonymous Worker'}</span>
-                      {app.worker_rating && <span className="text-xs font-bold text-amber-500">⭐ {app.worker_rating.toFixed(1)}</span>}
-                    </div>
-                    <p className="text-xs text-slate-600 font-medium">"{app.worker_message || 'No submission message provided.'}"</p>
-                  </div>
-                  <div className="flex gap-2 shrink-0">
-                    <button
-                      type="button"
-                      onClick={() => handleDeclineCandidate(app.application_id)}
-                      className="border border-slate-200 hover:border-red-200 text-slate-600 hover:text-red-600 text-xs font-bold px-3.5 py-2 rounded-xl bg-white transition"
-                    >
-                      Decline Worker
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleApproveCandidate(app.application_id, focusedJob.job_id)}
-                      className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold px-3.5 py-2 rounded-xl transition"
-                    >
-                      Accept Worker
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
+      <form onSubmit={handleProfileUpdateSubmit} className="space-y-5 pt-5">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          
+          {/* Full Name Field */}
+          <div className="sm:col-span-2">
+            <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-700 mb-1.5 pl-1">Full Name</label>
+            <input 
+              required 
+              type="text" 
+              className="w-full border border-slate-300/60 rounded-xl p-3 text-sm focus:outline-hidden focus:border-blue-600 focus:ring-2 focus:ring-blue-600/20 transition-all bg-white/50 backdrop-blur-xs placeholder-slate-400 font-medium text-slate-900" 
+              value={profileForm.name} 
+              onChange={(e) => setProfileForm({ ...profileForm, name: e.target.value })} 
+            />
           </div>
+
+          {/* Email Address Field */}
+          <div className="sm:col-span-2">
+            <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-700 mb-1.5 pl-1">Email Address</label>
+            <input 
+              required 
+              type="email" 
+              className="w-full border border-slate-300/60 rounded-xl p-3 text-sm focus:outline-hidden focus:border-blue-600 focus:ring-2 focus:ring-blue-600/20 transition-all bg-white/50 backdrop-blur-xs placeholder-slate-400 font-medium text-slate-900" 
+              value={profileForm.email} 
+              onChange={(e) => setProfileForm({ ...profileForm, email: e.target.value })} 
+            />
+          </div>
+
+          {/* Phone Number Field (Stretched to span full width layout cleanly) */}
+          <div className="sm:col-span-2">
+            <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-700 mb-1.5 pl-1">Phone Number (Optional)</label>
+            <input 
+              type="tel" 
+              className="w-full border border-slate-300/60 rounded-xl p-3 text-sm focus:outline-hidden focus:border-blue-600 focus:ring-2 focus:ring-blue-600/20 transition-all bg-white/50 backdrop-blur-xs placeholder-slate-400 font-medium text-slate-900" 
+              placeholder="+44 7123 456789"
+              value={profileForm.phone} 
+              onChange={(e) => setProfileForm({ ...profileForm, phone: e.target.value })} 
+            />
+          </div>
+
         </div>
-      )}
+
+        {/* Form CTA Buttons */}
+        <div className="flex gap-3 pt-3 border-t border-slate-900/5 mt-6">
+          <button
+            type="button"
+            onClick={() => setShowProfileModal(false)}
+            className="flex-1 border border-slate-300/80 text-slate-700 font-bold text-xs py-3.5 rounded-xl transition-all bg-white/40 hover:bg-white/80 active:scale-98"
+          >
+            Cancel
+          </button>
+          <button
+            type="submit"
+            disabled={profileUpdateLoading}
+            className="flex-1 bg-linear-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 disabled:from-slate-300 disabled:to-slate-400 text-white font-bold text-xs py-3.5 rounded-xl transition-all shadow-md shadow-blue-600/10 hover:shadow-lg hover:shadow-blue-600/20 active:scale-98"
+          >
+            {profileUpdateLoading ? 'Saving...' : 'Save Updates'}
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+)}
 
       {/* --- WRITE TRANSACTION REVIEW MODAL --- */}
       {focusedReviewJob && (
